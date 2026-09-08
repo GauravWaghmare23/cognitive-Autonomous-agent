@@ -24,7 +24,7 @@ export const availableTools = [
         getTool: () => google.tools.urlContext({}),
         enabled: false,
     },
-]
+];
 
 export function getEnabledTools() {
 
