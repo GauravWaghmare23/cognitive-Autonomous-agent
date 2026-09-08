@@ -10,7 +10,7 @@ export function TerminalDemo() {
         {/* Section heading */}
         <Reveal className={cn('mx-auto', 'max-w-2xl', 'text-center')}>
           <p className={cn('text-sm', 'font-medium', 'text-primary')}>
-            SEE ARC IN ACTION
+            SEE COGNIVEX IN ACTION
           </p>
 
           <h2 className={cn('mt-3', 'text-3xl', 'font-bold', 'tracking-tight', 'sm:text-4xl')}>
@@ -74,7 +74,7 @@ export function TerminalDemo() {
               {/* Response */}
               <div className="mt-6">
                 <p className="text-white">
-                  ARC found 3 authentication flows:
+                  Cognivex found 3 authentication flows:
                 </p>
 
                 <div className={cn('mt-3', 'space-y-1', 'text-white/60')}>

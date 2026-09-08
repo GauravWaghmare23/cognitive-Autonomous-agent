@@ -45,7 +45,7 @@ export function HeroSection() {
         {/* Description */}
         <Reveal delay={160}>
           <p className={cn('mx-auto', 'mt-8', 'max-w-2xl', 'text-base', 'leading-7', 'text-muted-foreground', 'sm:text-lg', 'sm:leading-8')}>
-            ARC brings AI directly into your terminal.
+<p className={cn('mx-auto', 'mt-8', 'max-w-2xl', 'text-base', 'leading-7', 'text-muted-foreground', 'sm:text-lg', 'sm:leading-8')}>Cognivex brings AI directly into your terminal.</p>
             Understand your code, debug problems, automate
             repetitive tasks, and build faster without leaving
             your development environment.

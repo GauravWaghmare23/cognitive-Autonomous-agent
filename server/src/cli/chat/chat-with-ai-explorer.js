@@ -21,61 +21,31 @@ const aiService = new AIService();
 
 const explorer = createExplorerTools();
 
-// ---------------------------------------------------------
-// MARKDOWN
-// ---------------------------------------------------------
-
 marked.use(
   markedTerminal({
     code: chalk.cyan,
-
     blockquote: chalk.gray.italic,
-
     heading: chalk.green.bold,
-
     firstHeading: chalk.hex("#22C55E").bold,
-
     hr: chalk.dim,
-
     listitem: chalk.reset,
-
     list: chalk.reset,
-
     paragraph: chalk.reset,
-
     strong: chalk.bold,
-
     em: chalk.italic,
-
     codespan: chalk.cyan,
-
     del: chalk.dim.gray.strikethrough,
-
     link: chalk.cyan.underline,
-
     href: chalk.cyan.underline,
   }),
 );
 
-// ---------------------------------------------------------
-// COLORS
-// ---------------------------------------------------------
-
 const accent = chalk.hex("#22C55E");
-
 const secondary = chalk.gray;
-
 const muted = chalk.dim;
-
 const rose = chalk.hex("#F87171");
-
 const amber = chalk.hex("#FBBF24");
-
 const blue = chalk.hex("#60A5FA");
-
-// ---------------------------------------------------------
-// UI HELPERS
-// ---------------------------------------------------------
 
 const divider = () => muted(`  ${"─".repeat(58)}`);
 
@@ -90,23 +60,16 @@ function indentBlock(content, spaces = 4) {
 
 function renderUserMessage(content) {
   console.log();
-
   console.log(`  ${chalk.cyan("›")} ${chalk.bold("You")}`);
-
   console.log(indentBlock(content));
 }
 
 function renderAssistantMessage(content) {
   console.log();
-
   console.log(`  ${accent("◆")} ${chalk.bold("ARC Explorer")}`);
-
   console.log(divider());
-
   const rendered = marked.parse(content).trim();
-
   console.log(indentBlock(rendered));
-
   console.log();
 }
 
@@ -121,10 +84,6 @@ function displayMessages(messages) {
 
   console.log(divider());
 }
-
-// ---------------------------------------------------------
-// AUTHENTICATION
-// ---------------------------------------------------------
 
 async function getUserFromToken() {
   const token = await getStoredToken();
@@ -170,10 +129,6 @@ async function getUserFromToken() {
   }
 }
 
-// ---------------------------------------------------------
-// CONVERSATION
-// ---------------------------------------------------------
-
 export async function initConversation(
   userId,
   conversationId = null,
@@ -212,10 +167,6 @@ export async function initConversation(
   return conversation;
 }
 
-// ---------------------------------------------------------
-// DATABASE HELPERS
-// ---------------------------------------------------------
-
 async function saveMessage(conversationId, role, content) {
   return await chatService.addMessage(conversationId, role, content);
 }
@@ -239,10 +190,6 @@ function printExit(message = "Explorer session ended") {
 
   console.log();
 }
-
-// ---------------------------------------------------------
-// ACTION UI
-// ---------------------------------------------------------
 
 function getActionLabel(action) {
   switch (action.action) {
@@ -286,10 +233,6 @@ function printActionComplete(action, result) {
   );
 }
 
-// ---------------------------------------------------------
-// TOKEN UI
-// ---------------------------------------------------------
-
 function printTokenUsage(usage) {
   const inputTokens = usage?.inputTokens || 0;
 
@@ -306,10 +249,6 @@ function printTokenUsage(usage) {
   );
 }
 
-// ---------------------------------------------------------
-// EXECUTE EXPLORER ACTION
-// ---------------------------------------------------------
-
 async function executeExplorerAction(action) {
   switch (action.action) {
     case "list_directory":
@@ -325,10 +264,6 @@ async function executeExplorerAction(action) {
       throw new Error(`Unsupported Explorer action: ${action.action}`);
   }
 }
-
-// ---------------------------------------------------------
-// EXPLORATION HEADER
-// ---------------------------------------------------------
 
 function printInvestigationHeader(userInput) {
   console.log();
@@ -354,10 +289,6 @@ function printInvestigationHeader(userInput) {
 
   console.log();
 }
-
-// ---------------------------------------------------------
-// EXECUTION SUMMARY
-// ---------------------------------------------------------
 
 function printExecutionSummary(metrics) {
   const {
@@ -399,10 +330,6 @@ function printExecutionSummary(metrics) {
 
   console.log();
 }
-
-// ---------------------------------------------------------
-// RUN EXPLORER AGENT
-// ---------------------------------------------------------
 
 async function runExplorerAgent(conversation, userInput) {
   printInvestigationHeader(userInput);
@@ -619,10 +546,6 @@ Please narrow the request or target a specific project or file.`;
   }
 }
 
-// ---------------------------------------------------------
-// INTERACTION LOOP
-// ---------------------------------------------------------
-
 async function explorerLoop(conversation) {
   const helpRows = [
     ["Enter", "Explore workspace"],
@@ -720,10 +643,6 @@ async function explorerLoop(conversation) {
     }
   }
 }
-
-// ---------------------------------------------------------
-// START EXPLORER
-// ---------------------------------------------------------
 
 export async function startExplorerAgent(
   conversationId = null,

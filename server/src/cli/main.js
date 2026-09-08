@@ -10,27 +10,16 @@ import { login, logout, whoami } from "./commands/auth/login.js";
 import { wakeup } from "./commands/ai/wakeup.js";
 
 async function main() {
-  // --------------------------------------------------
-  // Check which command was provided
-  // --------------------------------------------------
 
   const command = process.argv[2];
 
-  // Show banner only when no command is provided
   const showBanner = !command;
 
-  // --------------------------------------------------
-  // Colors
-  // --------------------------------------------------
 
   const accent = chalk.hex("#22C55E");
   const white = chalk.white;
   const secondary = chalk.gray;
   const muted = chalk.dim.gray;
-
-  // --------------------------------------------------
-  // Display Cognivex banner
-  // --------------------------------------------------
 
   if (showBanner) {
     console.log();
@@ -76,9 +65,6 @@ async function main() {
     console.log();
   }
 
-  // --------------------------------------------------
-  // Commander
-  // --------------------------------------------------
 
   const program = new Command();
 
@@ -93,10 +79,6 @@ async function main() {
 
   program.parse();
 }
-
-// --------------------------------------------------
-// Global CLI error handling
-// --------------------------------------------------
 
 main().catch((error) => {
   console.log();

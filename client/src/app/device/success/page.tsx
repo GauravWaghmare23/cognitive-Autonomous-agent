@@ -23,7 +23,7 @@ export default function DeviceSuccessPage() {
         </h1>
 
         <p className={cn('mx-auto', 'mt-3', 'max-w-sm', 'text-sm', 'leading-6', 'text-gray-500')}>
-          Your ARC terminal has been successfully connected
+          Your Cognivex terminal has been successfully connected
           to your account.
         </p>
 
@@ -33,7 +33,7 @@ export default function DeviceSuccessPage() {
           </p>
 
           <p className={cn('mt-1', 'text-xs', 'text-gray-500')}>
-            You can return to your terminal and continue using ARC.
+            You can return to your terminal and continue using Cognivex.
           </p>
         </div>
 

@@ -10,10 +10,6 @@ import { startAgentChat } from "../../chat/chat-with-ai-agents.js";
 import { startExplorerAgent } from "../../chat/chat-with-ai-explorer.js";
 
 
-// --------------------------------------------------
-// CLI Theme
-// --------------------------------------------------
-
 const accent = chalk.hex("#22C55E");
 const white = chalk.white;
 const secondary = chalk.gray;

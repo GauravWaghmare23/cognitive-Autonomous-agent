@@ -1,10 +1,10 @@
 import { google } from "@ai-sdk/google";
 import { streamText, stepCountIs, generateObject } from "ai";
-
 import { config } from "../../config/google.config.js";
 import chalk from "chalk";
-
 import { explorerConfig } from "../../config/explorer.config.js";
+
+
 
 export class AIService {
   constructor() {
@@ -16,6 +16,8 @@ export class AIService {
       apiKey: config.googleApiKey,
     });
   }
+
+
 
   async sendMessage(messages, chunks, tools = undefined, onToolCall = null) {
     try {
@@ -92,19 +94,16 @@ export class AIService {
     }
   }
 
+
+
   async getMessage(messages, tools = undefined) {
     const result = await this.sendMessage(messages, null, tools);
 
     return result.content;
   }
 
-  /**
-   * Generate structured AI output.
-   *
-   * @param {Object} schema
-   * @param {string} prompt
-   * @returns {Promise<Object>}
-   */
+
+
   async generateStructured(schema, prompt) {
     try {
       const result = await generateObject({
@@ -124,9 +123,8 @@ export class AIService {
     }
   }
 
-  /**
-   * Generate the next Explorer Agent action.
-   */
+
+
   async generateExplorerAction(messages) {
     try {
       const result = await generateObject({
@@ -150,4 +148,5 @@ export class AIService {
       throw error;
     }
   }
+  
 }

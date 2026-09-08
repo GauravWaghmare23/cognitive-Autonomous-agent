@@ -26,7 +26,6 @@ import {
 
 marked.use(
     markedTerminal({
-        // Styling options for terminal output
         code: chalk.cyan,
         blockquote: chalk.gray.italic,
         heading: chalk.green.bold,
@@ -46,11 +45,6 @@ marked.use(
 
 const chatService = new ChatService();
 const aiService = new AIService();
-
-
-// --------------------------------------------------
-// CLI Theme
-// --------------------------------------------------
 
 const accent = chalk.hex("#22C55E");
 const secondary = chalk.gray;
@@ -216,7 +210,6 @@ async function initConversation(userId, conversationId = null, mode = "tool") {
     return conversation;
 
 }
-
 
 
 

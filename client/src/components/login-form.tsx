@@ -77,7 +77,7 @@ export const LoginForm = () => {
         </h1>
 
         <p className={cn('mt-2', 'text-sm', 'text-muted-foreground')}>
-          Sign in to your ARC account
+          <p className={cn('mt-2', 'text-sm', 'text-muted-foreground')}>Sign in to your Cognivex account</p>
         </p>
       </div>
 

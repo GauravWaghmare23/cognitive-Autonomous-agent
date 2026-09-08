@@ -27,18 +27,8 @@ import {
 } from "../../../config/token.js";
 import { prisma } from "../../../config/database.js";
 
-
-// --------------------------------------------------
-// Configuration
-// --------------------------------------------------
-
 const DEFAULT_SERVER_URL = process.env.AUTH_URL || "http://localhost:4000";
 const DEFAULT_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
-
-
-// --------------------------------------------------
-// CLI Theme
-// --------------------------------------------------
 
 const colors = {
   primary: chalk.white,
@@ -51,10 +41,6 @@ const colors = {
   bold: chalk.bold,
 };
 
-
-// --------------------------------------------------
-// Helpers
-// --------------------------------------------------
 
 function printDivider() {
   console.log(colors.muted("─".repeat(54)));
@@ -78,10 +64,6 @@ function formatTime(seconds) {
   return `${minutes}m`;
 }
 
-
-// --------------------------------------------------
-// Login
-// --------------------------------------------------
 
 export async function loginAction(opts) {
   const serverUrl = opts.serverUrl || DEFAULT_SERVER_URL;
@@ -342,11 +324,6 @@ export async function loginAction(opts) {
   }
 }
 
-
-// --------------------------------------------------
-// Device Token Polling
-// --------------------------------------------------
-
 async function pollForToken(
   authClient,
   deviceCode,
@@ -554,11 +531,6 @@ export async function whoAmIAction() {
 
   console.log();
 }
-
-
-// --------------------------------------------------
-// Commander
-// --------------------------------------------------
 
 export const login = new Command("login")
   .description("Authenticate your ARC CLI")

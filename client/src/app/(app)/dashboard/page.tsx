@@ -84,7 +84,7 @@ export default function DashboardPage() {
               )}
             >
               You need to sign in before accessing your
-              ARC workspace.
+              Cognivex workspace.
             </p>
 
             <Button
@@ -150,7 +150,7 @@ export default function DashboardPage() {
               "text-muted-foreground"
             )}
           >
-            Your ARC workspace is ready.
+            Your Cognivex workspace is ready.
           </p>
         </div>
 
@@ -309,11 +309,11 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* ARC Workspace */}
+          {/* Cognivex Workspace */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                ARC Workspace
+                Cognivex Workspace
               </CardTitle>
             </CardHeader>
 
@@ -334,7 +334,7 @@ export default function DashboardPage() {
                   router.push("/workspace");
                 }}
               >
-                Open ARC
+                Open Cognivex
               </Button>
             </CardContent>
           </Card>
@@ -466,7 +466,7 @@ export default function DashboardPage() {
                   "text-muted-foreground"
                 )}
               >
-                Start using ARC from your terminal
+                Start using Cognivex from your terminal
                 and connect your development
                 workflow with your AI assistant.
               </p>
@@ -498,7 +498,7 @@ export default function DashboardPage() {
                 )}
               >
                 Learn how to install, configure,
-                and use ARC in your development
+                and use Cognivex in your development
                 workflow.
               </p>
 

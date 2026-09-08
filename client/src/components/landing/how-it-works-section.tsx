@@ -11,16 +11,16 @@ interface Step {
 const steps: Step[] = [
   {
     number: "01",
-    title: "Install ARC",
+    title: "Install Cognivex",
     description:
-      "Install ARC globally and make it available directly from your terminal.",
+      "Install Cognivex globally and make it available directly from your terminal.",
     command: "npm install -g arc-cli",
   },
   {
     number: "02",
     title: "Connect your account",
     description:
-      "Sign in to your ARC account and connect your development environment.",
+      "Sign in to your Cognivex account and connect your development environment.",
     command: "arc login",
   },
   {
@@ -48,7 +48,7 @@ export function HowItWorksSection() {
           </h2>
 
           <p className={cn('mt-4', 'text-base', 'leading-7', 'text-muted-foreground')}>
-            Get ARC running in your development environment
+            Get Cognivex running in your development environment
             and start using AI directly from your terminal.
           </p>
         </Reveal>

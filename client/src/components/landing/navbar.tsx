@@ -42,7 +42,7 @@ export function Navbar() {
               <span className={cn('absolute', 'inset-x-0', 'bottom-0', 'h-[2px]', 'bg-emerald-400')} />
             </div>
 
-            <span className="tracking-tight">ARC</span>
+            <span className="tracking-tight">Cognivex</span>
           </Link>
 
           {/* Navigation */}
@@ -75,7 +75,7 @@ export function Navbar() {
 
                 <Button className="group">
                   <Link href="/dashboard" className={cn('flex', 'items-center')}>
-                    Open ARC
+                    Open Cognivex
                     <span className={cn('ml-1.5', 'inline-block', 'font-mono', 'text-primary-foreground/60', 'transition-transform', 'group-hover:translate-x-0.5')}>
                       ›
                     </span>

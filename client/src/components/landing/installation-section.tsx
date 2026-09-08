@@ -28,11 +28,11 @@ export function InstallationSection() {
           </p>
 
           <h2 className={cn('mt-3', 'text-3xl', 'font-bold', 'tracking-tight', 'sm:text-4xl')}>
-            Install ARC and start building.
+            Install Cognivex and start building.
           </h2>
 
           <p className={cn('mx-auto', 'mt-4', 'max-w-2xl', 'text-base', 'leading-7', 'text-muted-foreground')}>
-            Get ARC running in your development environment
+            Get Cognivex running in your development environment
             and bring AI assistance directly into your terminal.
           </p>
         </Reveal>

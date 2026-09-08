@@ -21,7 +21,7 @@ const features: Feature[] = [
     icon: Compass,
     title: "Understand your code",
     description:
-      "Ask ARC to explain files, functions, modules, and unfamiliar parts of your codebase without leaving the terminal.",
+      "Ask Cognivex to explain files, functions, modules, and unfamiliar parts of your codebase without leaving the terminal.",
   },
   {
     icon: Bug,
@@ -39,7 +39,7 @@ const features: Feature[] = [
     icon: Workflow,
     title: "Automate workflows",
     description:
-      "Turn repetitive development tasks into reusable commands and let ARC handle the routine work.",
+      "Turn repetitive development tasks into reusable commands and let Cognivex handle the routine work.",
   },
   {
     icon: Sparkles,
@@ -73,7 +73,7 @@ export function FeaturesSection() {
           </h2>
 
           <p className={cn('mt-4', 'text-base', 'leading-7', 'text-muted-foreground')}>
-            ARC brings practical AI capabilities directly into
+            Cognivex brings practical AI capabilities directly into
             your command-line workflow.
           </p>
         </Reveal>

@@ -23,7 +23,7 @@ export default function DeviceDeniedPage() {
         </h1>
 
         <p className={cn('mx-auto', 'mt-3', 'max-w-sm', 'text-sm', 'leading-6', 'text-gray-500')}>
-          The ARC terminal was not authorized to access
+          The Cognivex terminal was not authorized to access
           your account.
         </p>
 

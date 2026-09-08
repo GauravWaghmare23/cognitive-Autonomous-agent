@@ -17,7 +17,7 @@ const useCases: UseCase[] = [
   {
     title: "Debug errors faster",
     description:
-      "Give ARC an error or failing component and get help understanding the problem and possible solutions.",
+      "Give Cognivex an error or failing component and get help understanding the problem and possible solutions.",
     command: "arc debug ./error.log",
   },
   {
@@ -41,7 +41,7 @@ const useCases: UseCase[] = [
   {
     title: "Automate repetitive tasks",
     description:
-      "Use ARC commands to simplify common development workflows and reduce repetitive terminal work.",
+      "Use Cognivex commands to simplify common development workflows and reduce repetitive terminal work.",
     command: "arc run build",
   },
 ];
@@ -65,7 +65,7 @@ export function UseCasesSection() {
 
           <p className={cn('mt-4', 'text-base', 'leading-7', 'text-muted-foreground')}>
             From understanding an unfamiliar codebase to
-            debugging and automation, ARC helps you get more
+            debugging and automation, Cognivex helps you get more
             done from the terminal.
           </p>
         </Reveal>

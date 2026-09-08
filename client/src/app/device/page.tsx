@@ -217,7 +217,7 @@ const Page = () => {
                             "text-muted-foreground"
                         )}
                     >
-                        ARC needs you to sign in before you can
+                        Cognivex needs you to sign in before you can
                         authorize this device.
                     </p>
 
@@ -258,7 +258,7 @@ const Page = () => {
                             "hover:bg-primary/90"
                         )}
                     >
-                        Sign in to ARC
+                        Sign in to Cognivex
                         <ArrowRight className={cn('h-4', 'w-4')} />
                     </button>
 
@@ -359,7 +359,7 @@ const Page = () => {
                             "tracking-tight"
                         )}
                     >
-                        ARC
+                        Cognivex
                     </h1>
 
                     <p
@@ -369,7 +369,7 @@ const Page = () => {
                             "text-muted-foreground"
                         )}
                     >
-                        AI Command Line Assistant
+                        Cognitive Autonomous Agent
                     </p>
                 </div>
 
@@ -418,7 +418,7 @@ const Page = () => {
                                 "text-muted-foreground"
                             )}
                         >
-                            Authorize ARC to connect this terminal
+                            Authorize Cognivex to connect this terminal
                             to your account.
                         </p>
                     </div>
@@ -552,7 +552,7 @@ const Page = () => {
                                     "text-muted-foreground"
                                 )}
                             >
-                                Enter the code displayed in your ARC
+                                Enter the code displayed in your Cognivex
                                 terminal.
                             </p>
                         </div>
@@ -635,7 +635,7 @@ const Page = () => {
                         "text-muted-foreground"
                     )}
                 >
-                    Only authorize ARC if you initiated this
+                    Only authorize Cognivex if you initiated this
                     request from your own terminal.
                 </p>
             </div>

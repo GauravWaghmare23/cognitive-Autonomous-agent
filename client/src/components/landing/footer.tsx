@@ -6,7 +6,7 @@ export function Footer() {
     <footer className={cn('relative', 'border-t')}>
       <div
         aria-hidden
-        className={cn('pointer-events-none', 'absolute', 'inset-x-0', 'top-0', 'h-px', 'bg-gradient-to-r', 'from-transparent', 'via-emerald-500/40', 'to-transparent')}
+        className={cn('pointer-events-none', 'absolute', 'inset-x-0', 'top-0', 'h-px', 'bg-linear-to-r', 'from-transparent', 'via-emerald-500/40', 'to-transparent')}
       />
 
       <div className={cn('mx-auto', 'max-w-7xl', 'px-6', 'py-12')}>
@@ -17,10 +17,10 @@ export function Footer() {
               href="/"
               className={cn('inline-flex', 'items-center', 'gap-2.5', 'text-xl', 'font-bold', 'tracking-tight')}
             >
-              <div className={cn('flex', 'h-7', 'w-7', 'items-center', 'justify-center', 'rounded-md', 'bg-gradient-to-br', 'from-foreground', 'to-foreground/70', 'font-mono', 'text-xs', 'text-background')}>
+              <div className={cn('flex', 'h-7', 'w-7', 'items-center', 'justify-center', 'rounded-md', 'bg-linear-to-br', 'from-foreground', 'to-foreground/70', 'font-mono', 'text-xs', 'text-background')}>
                 A
               </div>
-              ARC
+              <span>Cognivex</span>
             </Link>
 
             <p className={cn('mt-3', 'max-w-sm', 'text-sm', 'leading-6', 'text-muted-foreground')}>
@@ -102,7 +102,7 @@ export function Footer() {
         {/* Bottom */}
         <div className={cn('mt-10', 'flex', 'flex-col', 'gap-4', 'border-t', 'pt-8', 'sm:flex-row', 'sm:items-center', 'sm:justify-between')}>
           <p className={cn('text-sm', 'text-muted-foreground')}>
-            © 2026 ARC. All rights reserved.
+            © 2026 Cognivex. All rights reserved.
           </p>
 
           <div className={cn('flex', 'gap-6', 'text-sm', 'text-muted-foreground')}>

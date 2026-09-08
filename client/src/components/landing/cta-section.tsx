@@ -14,7 +14,7 @@ export function CTASection() {
       <div className={cn('relative', 'mx-auto', 'max-w-3xl', 'text-center')}>
         <Reveal>
           <p className={cn('text-sm', 'font-medium', 'text-primary')}>
-            GET STARTED WITH ARC
+            GET STARTED WITH COGNIVEX
           </p>
 
           <h2 className={cn('mt-3', 'text-3xl', 'font-bold', 'tracking-tight', 'sm:text-4xl')}>
@@ -22,7 +22,7 @@ export function CTASection() {
           </h2>
 
           <p className={cn('mx-auto', 'mt-4', 'max-w-2xl', 'text-base', 'leading-7', 'text-muted-foreground')}>
-            Create your ARC account, connect your development
+            Create your Cognivex account, connect your development
             workflow, and start using AI where you already build.
           </p>
         </Reveal>

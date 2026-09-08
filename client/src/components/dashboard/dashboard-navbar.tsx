@@ -64,7 +64,7 @@ export function DashboardNavbar() {
             A
           </div>
 
-          <span>ARC</span>
+          <span>Cognivex</span>
         </Link>
 
         {/* Center Navigation */}
