@@ -6,6 +6,7 @@ import { prisma } from "../../../config/database.js";
 import { select } from "@clack/prompts";
 import { startChat } from "../../chat/chat-with-ai.js";
 import { startToolChat } from "../../chat/chat-with-ai-tools.js";
+import { startAgentChat } from "../../chat/chat-with-ai-agents.js";
 
 
 // --------------------------------------------------
@@ -93,9 +94,7 @@ const wakeupAction = async () => {
             break;
 
         case "agent":
-            console.log();
-            console.log(`  ${muted("Agentic mode is coming soon.")}`);
-            console.log();
+            await startAgentChat();
             break;
     }
 }
