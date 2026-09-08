@@ -1,4 +1,4 @@
-# Arc CLI & Dashboard
+# ARC — Adaptive Reasoning & Code Intelligence Runtime Engine
 
 <div align="center">
   <h3><strong>The futuristic, AI-powered CLI and Device Management Platform.</strong></h3>
