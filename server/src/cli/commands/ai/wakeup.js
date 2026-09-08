@@ -7,6 +7,7 @@ import { select } from "@clack/prompts";
 import { startChat } from "../../chat/chat-with-ai.js";
 import { startToolChat } from "../../chat/chat-with-ai-tools.js";
 import { startAgentChat } from "../../chat/chat-with-ai-agents.js";
+import { startExplorerAgent } from "../../chat/chat-with-ai-explorer.js";
 
 
 // --------------------------------------------------
@@ -67,34 +68,41 @@ const wakeupAction = async () => {
         message: "Select an option",
         options: [
             {
-                value: "chat",
+                value: "Chat",
                 label: "Chat",
                 hint: "Simple chat with AI",
             },
             {
-                value: "tool",
+                value: "Tool",
                 label: "Tool Calling",
                 hint: "Chat with tools (Google Search, Code Execution)",
             },
             {
-                value: "agent",
-                label: "Agentic Mode",
-                hint: "Advanced AI agent — coming soon",
+                value: "Application",
+                label: "Application Agent",
+                hint: "Generate complete applications from your ideas",
+            },
+            {
+                value: "Explorer",
+                label: "Explorer Agent",
+                hint: "Explore, read, create and modify workspace files",
             },
         ],
     });
 
     switch (choice) {
-        case "chat":
+        case "Chat":
             startChat();
             break;
 
-        case "tool":
+        case "Tool":
             await startToolChat();
             break;
-
-        case "agent":
+        case "Application":
             await startAgentChat();
+            break;
+        case "Explorer":
+            await startExplorerAgent();
             break;
     }
 }

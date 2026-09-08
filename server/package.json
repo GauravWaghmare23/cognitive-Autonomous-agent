@@ -1,5 +1,5 @@
 {
-  "name": "arc",
+  "name": "cognivex",
   "version": "1.0.0",
   "description": "",
   "license": "ISC",
@@ -7,7 +7,7 @@
   "type": "module",
   "main": "src/index.js",
   "bin": {
-    "arc": "./src/cli/main.js"
+    "cognivex": "./src/cli/main.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

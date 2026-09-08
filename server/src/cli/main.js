@@ -5,6 +5,7 @@ import "dotenv/config";
 import chalk from "chalk";
 import figlet from "figlet";
 import { Command } from "commander";
+
 import { login, logout, whoami } from "./commands/auth/login.js";
 import { wakeup } from "./commands/ai/wakeup.js";
 
@@ -28,7 +29,7 @@ async function main() {
   const muted = chalk.dim.gray;
 
   // --------------------------------------------------
-  // Display ARC banner
+  // Display Cognivex banner
   // --------------------------------------------------
 
   if (showBanner) {
@@ -36,31 +37,41 @@ async function main() {
 
     console.log(
       accent(
-        figlet.textSync("ARC Mark I", {
+        figlet.textSync("COGNIVEX", {
           font: "Standard",
           horizontalLayout: "default",
           verticalLayout: "default",
-        })
-      )
+        }),
+      ),
     );
 
     console.log(
-      `  ${white("AI-powered developer assistant")}  ${muted("· v0.1.0")}`
+      `  ${white("Cognitive Autonomous Agent")}  ${muted("· v0.1.0")}`,
     );
 
     console.log(
       `  ${secondary(
-        "Understand code, debug faster, and build smarter — right from your terminal."
-      )}`
+        "Reason, explore, and execute developer tasks through autonomous AI agents.",
+      )}`,
     );
 
     console.log();
+
     console.log(muted(`  ${"─".repeat(54)}`));
+
     console.log();
 
-    console.log(`  ${secondary("Get started")}     ${white("arc login")}`);
-    console.log(`  ${secondary("Start chatting")}  ${white("arc wakeup")}`);
-    console.log(`  ${secondary("All commands")}    ${white("arc --help")}`);
+    console.log(
+      `  ${secondary("Get started")}      ${white("cognivex login")}`,
+    );
+
+    console.log(
+      `  ${secondary("Start agent")}      ${white("cognivex wakeup")}`,
+    );
+
+    console.log(
+      `  ${secondary("All commands")}     ${white("cognivex --help")}`,
+    );
 
     console.log();
   }
@@ -72,22 +83,29 @@ async function main() {
   const program = new Command();
 
   program
-    .name("arc")
+    .name("cognivex")
     .version("0.1.0")
-    .description("AI-powered developer assistant")
+    .description("Cognitive Autonomous Agent")
     .addCommand(login)
     .addCommand(logout)
     .addCommand(whoami)
-    .addCommand(wakeup)
+    .addCommand(wakeup);
 
   program.parse();
 }
 
+// --------------------------------------------------
+// Global CLI error handling
+// --------------------------------------------------
 
 main().catch((error) => {
-    console.log();
-    console.log(chalk.red("  ✕ Error running arc cli"));
-    console.log(chalk.dim(`    ${error?.message || error}`));
-    console.log();
-    process.exit(1)
+  console.log();
+
+  console.log(chalk.red("  ✕ Error running cognivex cli"));
+
+  console.log(chalk.dim(`    ${error?.message || error}`));
+
+  console.log();
+
+  process.exit(1);
 });

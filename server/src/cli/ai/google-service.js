@@ -1,14 +1,15 @@
 import { google } from "@ai-sdk/google";
 import { streamText, stepCountIs, generateObject } from "ai";
+
 import { config } from "../../config/google.config.js";
 import chalk from "chalk";
+
+import { explorerConfig } from "../../config/explorer.config.js";
 
 export class AIService {
   constructor() {
     if (!config.googleApiKey) {
-      throw new Error(
-        chalk.red("Google API key is not defined")
-      );
+      throw new Error(chalk.red("Google API key is not defined"));
     }
 
     this.model = google(config.model, {
@@ -16,12 +17,7 @@ export class AIService {
     });
   }
 
-  async sendMessage(
-    messages,
-    chunks,
-    tools = undefined,
-    onToolCall = null
-  ) {
+  async sendMessage(messages, chunks, tools = undefined, onToolCall = null) {
     try {
       const streamConfig = {
         model: this.model,
@@ -31,12 +27,11 @@ export class AIService {
 
       if (tools && Object.keys(tools).length > 0) {
         streamConfig.tools = tools;
+
         streamConfig.stopWhen = stepCountIs(1);
 
         console.log(
-          chalk.dim(
-            `  using tools: ${Object.keys(tools).join(", ")}`
-          )
+          chalk.dim(`  using tools: ${Object.keys(tools).join(", ")}`),
         );
       }
 
@@ -57,10 +52,7 @@ export class AIService {
 
       if (result.steps && Array.isArray(result.steps)) {
         for (const step of result.steps) {
-          if (
-            step.toolCalls &&
-            step.toolCalls.length > 0
-          ) {
+          if (step.toolCalls && step.toolCalls.length > 0) {
             for (const toolCall of step.toolCalls) {
               toolCalls.push(toolCall);
 
@@ -70,81 +62,89 @@ export class AIService {
             }
           }
 
-          if (
-            step.toolResults &&
-            step.toolResults.length > 0
-          ) {
-            toolResults.push(
-              ...step.toolResults
-            );
+          if (step.toolResults && step.toolResults.length > 0) {
+            toolResults.push(...step.toolResults);
           }
         }
       }
 
       const usage = await result.usage;
 
-      console.log(
-        chalk.yellowBright(
-          `\n    Usage: ${JSON.stringify(usage)}`
-        )
-      );
+      console.log(chalk.yellowBright(`\n    Usage: ${JSON.stringify(usage)}`));
 
       return {
         content: fullResponse,
         finishResponse: await result.finishReason,
-        usage: usage,
-        toolCalls: toolCalls,
-        toolResults: toolResults,
+        usage,
+        toolCalls,
+        toolResults,
         steps: result.steps,
       };
-
     } catch (error) {
       console.log();
 
       console.log(
         chalk.red("  ✕ AI service error"),
-        chalk.dim(error?.message || error)
+        chalk.dim(error?.message || error),
       );
 
       throw error;
     }
   }
 
-  async getMessage(
-    messages,
-    tools = undefined
-  ) {
-    const result = await this.sendMessage(
-      messages,
-      null,
-      tools
-    );
+  async getMessage(messages, tools = undefined) {
+    const result = await this.sendMessage(messages, null, tools);
 
     return result.content;
   }
 
   /**
-* @param {Object} schema
-* @param {string} prompt
-* @returns {Promise<Object>}
-*/
-
+   * Generate structured AI output.
+   *
+   * @param {Object} schema
+   * @param {string} prompt
+   * @returns {Promise<Object>}
+   */
   async generateStructured(schema, prompt) {
     try {
       const result = await generateObject({
         model: this.model,
-        schema: schema,
-        prompt: prompt,
+        schema,
+        prompt,
       });
 
       return result.object;
-
     } catch (error) {
       console.log(
-        chalk.red(
-          "  ✕ Error generating structured output"
-        ),
-        chalk.dim(error?.message || error)
+        chalk.red("  ✕ Error generating structured output"),
+        chalk.dim(error?.message || error),
+      );
+
+      throw error;
+    }
+  }
+
+  /**
+   * Generate the next Explorer Agent action.
+   */
+  async generateExplorerAction(messages) {
+    try {
+      const result = await generateObject({
+        model: this.model,
+        schema: explorerConfig.agent.actionSchema,
+        system: explorerConfig.agent.systemPrompt,
+        messages,
+      });
+
+      return {
+        action: result.object,
+        usage: result.usage,
+        finishReason: result.finishReason,
+      };
+    } catch (error) {
+      console.log(
+        chalk.red("  ✕ Error generating explorer action"),
+        chalk.dim(error?.message || error),
       );
 
       throw error;
