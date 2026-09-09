@@ -4,8 +4,6 @@ import { config } from "../../config/google.config.js";
 import chalk from "chalk";
 import { explorerConfig } from "../../config/explorer.config.js";
 
-
-
 export class AIService {
   constructor() {
     if (!config.googleApiKey) {
@@ -17,13 +15,11 @@ export class AIService {
     });
   }
 
-
-
   async sendMessage(messages, chunks, tools = undefined, onToolCall = null) {
     try {
       const streamConfig = {
         model: this.model,
-        messages: messages,
+        messages,
         maxOutputTokens: config.maxOutputTokens,
       };
 
@@ -76,10 +72,15 @@ export class AIService {
 
       return {
         content: fullResponse,
+
         finishResponse: await result.finishReason,
+
         usage,
+
         toolCalls,
+
         toolResults,
+
         steps: result.steps,
       };
     } catch (error) {
@@ -94,15 +95,11 @@ export class AIService {
     }
   }
 
-
-
   async getMessage(messages, tools = undefined) {
     const result = await this.sendMessage(messages, null, tools);
 
     return result.content;
   }
-
-
 
   async generateStructured(schema, prompt) {
     try {
@@ -123,30 +120,49 @@ export class AIService {
     }
   }
 
-
-
   async generateExplorerAction(messages) {
-    try {
-      const result = await generateObject({
-        model: this.model,
-        schema: explorerConfig.agent.actionSchema,
-        system: explorerConfig.agent.systemPrompt,
-        messages,
-      });
+    const maxAttempts = 2;
 
-      return {
-        action: result.object,
-        usage: result.usage,
-        finishReason: result.finishReason,
-      };
-    } catch (error) {
-      console.log(
-        chalk.red("  ✕ Error generating explorer action"),
-        chalk.dim(error?.message || error),
-      );
+    let lastError = null;
 
-      throw error;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const result = await generateObject({
+          model: this.model,
+
+          schema: explorerConfig.agent.actionSchema,
+
+          system: explorerConfig.agent.systemPrompt,
+
+          messages,
+        });
+
+        return {
+          action: result.object,
+
+          usage: result.usage,
+
+          finishReason: result.finishReason,
+        };
+      } catch (error) {
+        lastError = error;
+
+        console.log(
+          chalk.yellow(
+            `  ⚠ Explorer action generation failed (attempt ${attempt}/${maxAttempts})`,
+          ),
+        );
+
+        console.log(chalk.dim(error?.message || error));
+
+        if (attempt < maxAttempts) {
+          console.log(chalk.dim("  Retrying Explorer action..."));
+        }
+      }
     }
+
+    console.log(chalk.red("  ✕ Explorer failed to generate a valid action."));
+
+    throw lastError;
   }
-  
 }

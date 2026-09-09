@@ -1,9 +1,7 @@
 import chalk from "chalk";
 import boxen from "boxen";
 import ora from "ora";
-
-import { text, isCancel, cancel, intro, outro } from "@clack/prompts";
-
+import { text, isCancel, intro, outro } from "@clack/prompts";
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
 
@@ -11,14 +9,11 @@ import { AIService } from "../ai/google-service.js";
 import { ChatService } from "../../service/chat.service.js";
 import { getStoredToken } from "../../config/token.js";
 import { prisma } from "../../config/database.js";
-
 import { createExplorerTools } from "../../tools/explorer.tools.js";
 import { explorerConfig } from "../../config/explorer.config.js";
 
 const chatService = new ChatService();
-
 const aiService = new AIService();
-
 const explorer = createExplorerTools();
 
 marked.use(
@@ -66,9 +61,11 @@ function renderUserMessage(content) {
 
 function renderAssistantMessage(content) {
   console.log();
-  console.log(`  ${accent("◆")} ${chalk.bold("ARC Explorer")}`);
+  console.log(`  ${accent("◆")} ${chalk.bold("Cognivex Explorer")}`);
   console.log(divider());
+
   const rendered = marked.parse(content).trim();
+
   console.log(indentBlock(rendered));
   console.log();
 }
@@ -89,12 +86,11 @@ async function getUserFromToken() {
   const token = await getStoredToken();
 
   if (!token?.access_token) {
-    throw new Error("Not authenticated. Please run 'arc login' first.");
+    throw new Error("Not authenticated. Please run 'cognivex login' first.");
   }
 
   const spinner = ora({
     text: secondary("Authenticating..."),
-
     spinner: "dots",
   }).start();
 
@@ -113,7 +109,7 @@ async function getUserFromToken() {
       spinner.fail("Authentication failed");
 
       throw new Error(
-        "No authenticated user found. Please run 'arc login' again.",
+        "No authenticated user found. Please run 'cognivex login' again.",
       );
     }
 
@@ -136,35 +132,38 @@ export async function initConversation(
 ) {
   const spinner = ora({
     text: secondary("Loading conversation..."),
-
     spinner: "dots",
   }).start();
 
-  const conversation = await chatService.getOrCreateConversation(
-    userId,
-    conversationId,
-    mode,
-  );
+  try {
+    const conversation = await chatService.getOrCreateConversation(
+      userId,
+      conversationId,
+      mode,
+    );
 
-  spinner.succeed("Conversation loaded");
+    spinner.succeed("Conversation loaded");
 
-  console.log();
+    console.log();
+    console.log(`  ${accent("●")} ${chalk.bold(conversation.title)}`);
 
-  console.log(`  ${accent("●")} ${chalk.bold(conversation.title)}`);
+    console.log(
+      `  ${muted(`id ${conversation.id}`)}  ${muted("·")}  ${muted(
+        `mode ${conversation.mode}`,
+      )}`,
+    );
 
-  console.log(
-    `  ${muted(`id ${conversation.id}`)}  ${muted("·")}  ${muted(
-      `mode ${conversation.mode}`,
-    )}`,
-  );
+    console.log(divider());
 
-  console.log(divider());
+    if (conversation.messages?.length > 0) {
+      displayMessages(conversation.messages);
+    }
 
-  if (conversation.messages?.length > 0) {
-    displayMessages(conversation.messages);
+    return conversation;
+  } catch (error) {
+    spinner.fail("Failed to load conversation");
+    throw error;
   }
-
-  return conversation;
 }
 
 async function saveMessage(conversationId, role, content) {
@@ -185,9 +184,7 @@ async function updateConversationTitle(
 
 function printExit(message = "Explorer session ended") {
   console.log();
-
   console.log(`  ${accent("✓")} ${secondary(message)}`);
-
   console.log();
 }
 
@@ -195,6 +192,9 @@ function getActionLabel(action) {
   switch (action.action) {
     case "list_directory":
       return `Inspecting directory ${chalk.cyan(action.path || ".")}`;
+
+    case "list_directory_tree":
+      return `Exploring directory tree ${chalk.cyan(action.path || ".")}`;
 
     case "search_files":
       return `Searching workspace for ${chalk.cyan(`"${action.query}"`)}`;
@@ -213,17 +213,20 @@ function printActionComplete(action, result) {
   switch (action.action) {
     case "list_directory":
       detail = `${result.entries?.length || 0} entries`;
+      break;
 
+    case "list_directory_tree":
+      detail =
+        `${result.totalEntries || 0} entries` +
+        (result.truncated ? " · result truncated" : "");
       break;
 
     case "search_files":
       detail = `${result.total || 0} matching files`;
-
       break;
 
     case "read_file":
       detail = `${result.size || 0} bytes`;
-
       break;
   }
 
@@ -235,9 +238,7 @@ function printActionComplete(action, result) {
 
 function printTokenUsage(usage) {
   const inputTokens = usage?.inputTokens || 0;
-
   const outputTokens = usage?.outputTokens || 0;
-
   const totalTokens = usage?.totalTokens || 0;
 
   console.log(
@@ -253,6 +254,9 @@ async function executeExplorerAction(action) {
   switch (action.action) {
     case "list_directory":
       return await explorer.listDirectory(action.path || ".");
+
+    case "list_directory_tree":
+      return await explorer.listDirectoryTree(action.path || ".");
 
     case "search_files":
       return await explorer.searchFiles(action.query, action.path || ".");
@@ -270,18 +274,14 @@ function printInvestigationHeader(userInput) {
 
   console.log(
     boxen(
-      `${chalk.bold.green("ARC EXPLORER")}\n` +
+      `${chalk.bold.green("COGNIVEX EXPLORER")}\n` +
         `${muted("Autonomous Workspace Investigation")}\n\n` +
         `${chalk.bold("Request")}\n` +
         `${secondary(userInput)}`,
-
       {
         padding: 1,
-
         borderStyle: "round",
-
         borderColor: "green",
-
         dimBorder: true,
       },
     ),
@@ -315,14 +315,10 @@ function printExecutionSummary(metrics) {
           "Output tokens",
         )}       ${totalOutputTokens.toLocaleString()}\n` +
         `${secondary("Total tokens")}        ${totalTokens.toLocaleString()}`,
-
       {
         padding: 1,
-
         borderStyle: "round",
-
         borderColor: "gray",
-
         dimBorder: true,
       },
     ),
@@ -342,33 +338,20 @@ async function runExplorerAgent(conversation, userInput) {
 
   let finalResponse = null;
 
-  // -----------------------------------------
-  // METRICS
-  // -----------------------------------------
-
   let aiCalls = 0;
-
   let toolCalls = 0;
-
   let totalInputTokens = 0;
-
   let totalOutputTokens = 0;
-
   let totalTokens = 0;
 
   const startedAt = Date.now();
 
   const spinner = ora({
     text: secondary("Planning investigation..."),
-
     spinner: "dots",
   }).start();
 
   try {
-    // -----------------------------------------
-    // AGENT LOOP
-    // -----------------------------------------
-
     for (let step = 1; step <= explorerConfig.maxSteps; step++) {
       spinner.stop();
 
@@ -377,26 +360,17 @@ async function runExplorerAgent(conversation, userInput) {
       console.log(`  ${blue("●")} ${chalk.bold(`Investigation step ${step}`)}`);
 
       console.log(
-        `  ${muted("ARC is deciding what information it needs next...")}`,
+        `  ${muted("Cognivex is deciding what information it needs next...")}`,
       );
 
       console.log();
 
       spinner.start(secondary("Analyzing workspace..."));
 
-      // -----------------------------------------
-      // AI DECISION
-      // -----------------------------------------
-
       const aiResult = await aiService.generateExplorerAction(messages);
 
       const action = aiResult.action;
-
       const usage = aiResult.usage;
-
-      // -----------------------------------------
-      // TRACK AI USAGE
-      // -----------------------------------------
 
       aiCalls++;
 
@@ -410,10 +384,6 @@ async function runExplorerAgent(conversation, userInput) {
 
       printTokenUsage(usage);
 
-      // -----------------------------------------
-      // FINISH
-      // -----------------------------------------
-
       if (action.action === "finish") {
         finalResponse = action.response || action.reason;
 
@@ -424,10 +394,6 @@ async function runExplorerAgent(conversation, userInput) {
         break;
       }
 
-      // -----------------------------------------
-      // SHOW ACTION
-      // -----------------------------------------
-
       console.log();
 
       console.log(`  ${amber("▸")} ${getActionLabel(action)}`);
@@ -436,13 +402,20 @@ async function runExplorerAgent(conversation, userInput) {
 
       console.log();
 
-      // -----------------------------------------
-      // EXECUTE TOOL
-      // -----------------------------------------
-
       spinner.start(secondary("Executing workspace operation..."));
 
-      const toolResult = await executeExplorerAction(action);
+      let toolResult;
+
+      try {
+        toolResult = await executeExplorerAction(action);
+      } catch (error) {
+        spinner.stop();
+
+        toolResult = {
+          success: false,
+          error: error.message,
+        };
+      }
 
       spinner.stop();
 
@@ -450,47 +423,39 @@ async function runExplorerAgent(conversation, userInput) {
 
       printActionComplete(action, toolResult);
 
-      // -----------------------------------------
-      // WORKING MEMORY
-      // -----------------------------------------
-
       messages.push({
         role: "assistant",
-
         content: JSON.stringify(action),
       });
 
       messages.push({
         role: "user",
-
         content: `
-Tool result for action "${action.action}":
+EXPLORER TOOL RESULT
 
+Action:
+${action.action}
+
+Result:
 ${JSON.stringify(toolResult, null, 2)}
 
-Continue investigating the original user request.
+Continue working on the ORIGINAL USER REQUEST.
 
-Use another action if more information
-is required.
-
-If you now have enough information to
-answer the original request, use the
-"finish" action.
-
-When finishing:
-
-- put the internal action explanation
-  in "reason"
-
-- put the complete user-facing Markdown
-  answer in "response"
-                `,
+Rules:
+- Treat the tool result as workspace evidence.
+- Do not invent information.
+- Do not repeat an action if the result already contains what is needed.
+- Use another action only when more information is genuinely required.
+- If the request can now be answered, use the "finish" action.
+- If the user asked for filenames or folders only, do not read file contents.
+- If the user asked for file contents, read the relevant files.
+- If the user asked for a complete directory tree and the result is not truncated, normally finish.
+- If a tool returned an error, do not repeatedly perform the same failing action.
+- When finishing, "reason" should briefly explain why the investigation is complete.
+- "response" must contain the complete user-facing Markdown answer.
+`,
       });
     }
-
-    // -----------------------------------------
-    // MAX STEPS
-    // -----------------------------------------
 
     if (!finalResponse) {
       finalResponse = `## Investigation Incomplete
@@ -500,48 +465,26 @@ I reached the maximum exploration limit of **${explorerConfig.maxSteps} steps** 
 Please narrow the request or target a specific project or file.`;
     }
 
-    // -----------------------------------------
-    // DURATION
-    // -----------------------------------------
-
     const durationMs = Date.now() - startedAt;
 
     const durationSeconds = (durationMs / 1000).toFixed(2);
 
-    // -----------------------------------------
-    // SAVE FINAL RESPONSE
-    // -----------------------------------------
-
     await saveMessage(conversation.id, "assistant", finalResponse);
-
-    // -----------------------------------------
-    // DISPLAY RESPONSE
-    // -----------------------------------------
 
     renderAssistantMessage(finalResponse);
 
-    // -----------------------------------------
-    // DISPLAY METRICS
-    // -----------------------------------------
-
     printExecutionSummary({
       aiCalls,
-
       toolCalls,
-
       totalInputTokens,
-
       totalOutputTokens,
-
       totalTokens,
-
       durationSeconds,
     });
 
     return finalResponse;
   } catch (error) {
     spinner.stop();
-
     throw error;
   }
 }
@@ -549,9 +492,7 @@ Please narrow the request or target a specific project or file.`;
 async function explorerLoop(conversation) {
   const helpRows = [
     ["Enter", "Explore workspace"],
-
     ["exit", "End the session"],
-
     ["Ctrl+C", "Quit anytime"],
   ];
 
@@ -559,7 +500,6 @@ async function explorerLoop(conversation) {
     helpRows
       .map(([key, desc]) => `${muted(key.padEnd(8))}${secondary(desc)}`)
       .join("\n"),
-
     {
       padding: {
         left: 1,
@@ -567,16 +507,12 @@ async function explorerLoop(conversation) {
         top: 0,
         bottom: 0,
       },
-
       margin: {
         top: 1,
         bottom: 1,
       },
-
       borderStyle: "round",
-
       borderColor: "gray",
-
       dimBorder: true,
     },
   );
@@ -586,9 +522,7 @@ async function explorerLoop(conversation) {
   while (true) {
     const userInput = await text({
       message: chalk.cyan("Message"),
-
       placeholder: "Ask me to explore your workspace...",
-
       validate(value) {
         if (!value || value.trim().length === 0) {
           return "Message cannot be empty";
@@ -598,13 +532,11 @@ async function explorerLoop(conversation) {
 
     if (isCancel(userInput)) {
       printExit();
-
       process.exit(0);
     }
 
     if (userInput.trim().toLowerCase() === "exit") {
       printExit();
-
       break;
     }
 
@@ -622,17 +554,11 @@ async function explorerLoop(conversation) {
       console.log();
 
       console.log(
-        boxen(
-          `${rose.bold("Explorer Error")}\n\n` + `${rose(error.message)}`,
-
-          {
-            padding: 1,
-
-            borderStyle: "round",
-
-            borderColor: "red",
-          },
-        ),
+        boxen(`${rose.bold("Explorer Error")}\n\n${rose(error.message)}`, {
+          padding: 1,
+          borderStyle: "round",
+          borderColor: "red",
+        }),
       );
 
       await saveMessage(
@@ -651,14 +577,11 @@ export async function startExplorerAgent(
   try {
     intro(
       boxen(
-        chalk.bold.green("🔎 ARC · Explorer Mode\n\n") +
+        chalk.bold.green("🔎 COGNIVEX · Explorer Mode\n\n") +
           chalk.gray("Autonomous Workspace Exploration Agent"),
-
         {
           padding: 1,
-
           borderStyle: "double",
-
           borderColor: "green",
         },
       ),
