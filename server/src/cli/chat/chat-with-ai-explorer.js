@@ -148,9 +148,9 @@ export async function initConversation(
     console.log(`  ${accent("●")} ${chalk.bold(conversation.title)}`);
 
     console.log(
-      `  ${muted(`id ${conversation.id}`)}  ${muted("·")}  ${muted(
-        `mode ${conversation.mode}`,
-      )}`,
+      `  ${muted(`id ${conversation.id}`)}  ` +
+        `${muted("·")}  ` +
+        `${muted(`mode ${conversation.mode}`)}`,
     );
 
     console.log(divider());
@@ -202,12 +202,26 @@ function getActionLabel(action) {
     case "read_file":
       return `Reading ${chalk.cyan(action.path)}`;
 
+    case "write_file":
+      return `Writing ${chalk.cyan(action.path)}`;
+
+    case "edit_file":
+      return `Editing ${chalk.cyan(action.path)}`;
+
+    case "delete_file":
+      return `Deleting ${chalk.cyan(action.path)}`;
+
+    case "finish":
+      return "Completing request";
+
     default:
       return "Analyzing workspace";
   }
 }
 
 function printActionComplete(action, result) {
+  const success = result?.success !== false;
+
   let detail = "";
 
   switch (action.action) {
@@ -228,17 +242,53 @@ function printActionComplete(action, result) {
     case "read_file":
       detail = `${result.size || 0} bytes`;
       break;
+
+    case "write_file":
+      detail =
+        result.operation === "overwrite"
+          ? `overwritten · ${result.size || 0} bytes`
+          : `created · ${result.size || 0} bytes`;
+      break;
+
+    case "edit_file":
+      detail =
+        `${result.replacements || 0} replacement` +
+        (result.replacements === 1 ? "" : "s") +
+        ` · ${result.size || 0} bytes`;
+      break;
+
+    case "delete_file":
+      detail = `deleted · ${result.size || 0} bytes`;
+      break;
+
+    default:
+      break;
   }
 
   console.log(
-    `  ${accent("✓")} ${secondary(getActionLabel(action))}` +
+    `  ${success ? accent("✓") : rose("✕")} ` +
+      `${secondary(getActionLabel(action))}` +
       (detail ? muted(` · ${detail}`) : ""),
   );
+
+  /*
+   * IMPORTANT:
+   *
+   * Previously the CLI only displayed "failed".
+   * That hid the actual reason.
+   *
+   * Now every tool failure displays the real error.
+   */
+  if (!success && result?.error) {
+    console.log(`    ${rose("Error:")} ${rose(result.error)}`);
+  }
 }
 
 function printTokenUsage(usage) {
   const inputTokens = usage?.inputTokens || 0;
+
   const outputTokens = usage?.outputTokens || 0;
+
   const totalTokens = usage?.totalTokens || 0;
 
   console.log(
@@ -250,7 +300,119 @@ function printTokenUsage(usage) {
   );
 }
 
+/*
+ * ==========================================================
+ * ACTION VALIDATION
+ * ==========================================================
+ */
+
+function validateExplorerAction(action) {
+  if (!action || !action.action) {
+    throw new Error("Explorer returned an invalid action.");
+  }
+
+  const validActions = [
+    "list_directory",
+    "list_directory_tree",
+    "search_files",
+    "read_file",
+    "write_file",
+    "edit_file",
+    "delete_file",
+    "finish",
+  ];
+
+  if (!validActions.includes(action.action)) {
+    throw new Error(`Unsupported Explorer action: ${action.action}`);
+  }
+
+  /*
+   * Path validation.
+   */
+
+  const pathRequiredActions = [
+    "list_directory",
+    "list_directory_tree",
+    "read_file",
+    "write_file",
+    "edit_file",
+    "delete_file",
+  ];
+
+  if (pathRequiredActions.includes(action.action)) {
+    if (typeof action.path !== "string" || !action.path.trim()) {
+      throw new Error(`${action.action} requires a valid path.`);
+    }
+  }
+
+  /*
+   * Search validation.
+   */
+
+  if (action.action === "search_files") {
+    if (typeof action.query !== "string" || !action.query.trim()) {
+      throw new Error("search_files requires a valid query.");
+    }
+  }
+
+  /*
+   * WRITE VALIDATION
+   *
+   * This is the critical part.
+   */
+
+  if (action.action === "write_file") {
+    if (typeof action.content !== "string") {
+      throw new Error(
+        "write_file requires the complete file content in the content field.",
+      );
+    }
+
+    if (action.content.trim().length === 0) {
+      throw new Error("write_file content cannot be empty.");
+    }
+  }
+
+  /*
+   * EDIT VALIDATION
+   */
+
+  if (action.action === "edit_file") {
+    if (typeof action.oldText !== "string" || action.oldText.length === 0) {
+      throw new Error("edit_file requires oldText.");
+    }
+
+    if (typeof action.newText !== "string") {
+      throw new Error("edit_file requires newText.");
+    }
+  }
+
+  /*
+   * FINISH VALIDATION
+   */
+
+  if (action.action === "finish") {
+    if (typeof action.response !== "string" || !action.response.trim()) {
+      throw new Error("finish requires a response.");
+    }
+
+    if (typeof action.reason !== "string" || !action.reason.trim()) {
+      throw new Error("finish requires a reason.");
+    }
+  }
+
+  return true;
+}
+
+/*
+ * ==========================================================
+ * ACTION EXECUTION
+ * ==========================================================
+ */
+
 async function executeExplorerAction(action) {
+  validateExplorerAction(action);
+
   switch (action.action) {
     case "list_directory":
       return await explorer.listDirectory(action.path || ".");
@@ -264,10 +426,151 @@ async function executeExplorerAction(action) {
     case "read_file":
       return await explorer.readFile(action.path);
 
+    case "write_file":
+      return await explorer.writeFile(action.path, action.content);
+
+    case "edit_file":
+      return await explorer.editFile(
+        action.path,
+        action.oldText,
+        action.newText,
+      );
+
+    case "delete_file":
+      return await explorer.deleteFile(action.path);
+
     default:
       throw new Error(`Unsupported Explorer action: ${action.action}`);
   }
 }
+
+/*
+ * ==========================================================
+ * ERROR RECOVERY MESSAGE
+ * ==========================================================
+ */
+
+function buildToolFeedback(action, toolResult) {
+  const isError = toolResult?.success === false;
+
+  if (isError) {
+    return `
+EXPLORER TOOL RESULT
+
+The previous workspace operation FAILED.
+
+Action:
+${action.action}
+
+Path:
+${action.path || "N/A"}
+
+Error:
+${toolResult.error || "Unknown error"}
+
+IMPORTANT RECOVERY INSTRUCTIONS:
+
+- Continue working on the ORIGINAL USER REQUEST.
+- Do not blindly repeat the same failed action.
+- Correct the invalid fields before retrying.
+- Never claim that an operation succeeded when it failed.
+
+If the failed operation was write_file and the error indicates missing or invalid content:
+
+1. Generate the complete requested file content yourself.
+2. Put the complete content inside the "content" field.
+3. Put the filename inside "path".
+4. Do not put the file content only in "reason".
+5. Do not put the file content only in "response".
+6. Retry write_file with actual non-empty content.
+
+A valid write_file action looks like:
+
+{
+  "action": "write_file",
+  "path": "example.md",
+  "query": null,
+  "content": "# Example\\n\\nActual complete file content goes here.",
+  "oldText": null,
+  "newText": null,
+  "reason": "Creating the requested file.",
+  "response": null
+}
+
+Return the next valid action now.
+`;
+  }
+
+  return `
+EXPLORER TOOL RESULT
+
+Action:
+${action.action}
+
+Path:
+${action.path || "N/A"}
+
+Result:
+${JSON.stringify(toolResult, null, 2)}
+
+Continue working on the ORIGINAL USER REQUEST.
+
+Rules:
+
+- Treat the tool result as workspace evidence.
+- Do not invent information.
+- Do not repeat an action if the result already contains what is needed.
+- Use another action only when more information is genuinely required.
+- If the request can now be answered, use finish.
+- If the user asked for file contents, read the relevant files.
+- If the user requested verification after writing or editing, read the file again.
+- Never claim a file was created, modified, or deleted unless the tool result confirms success.
+- response must contain the complete final user-facing answer when using finish.
+- reason must explain why the operation is complete.
+`;
+}
+
+/*
+ * ==========================================================
+ * FINISH RECOVERY
+ * ==========================================================
+ */
+
+function buildFinishValidationFeedback(error) {
+  return `
+EXPLORER FINISH VALIDATION ERROR
+
+The previous finish action was invalid.
+
+Error:
+${error.message}
+
+Continue the ORIGINAL USER REQUEST.
+
+If the requested workspace operation is not complete, perform the necessary workspace action first.
+
+If the operation is complete, return:
+
+{
+  "action": "finish",
+  "path": null,
+  "query": null,
+  "content": null,
+  "oldText": null,
+  "newText": null,
+  "reason": "Brief explanation of why the task is complete.",
+  "response": "Complete user-facing answer."
+}
+
+Do not omit required fields.
+`;
+}
+
+/*
+ * ==========================================================
+ * DISPLAY
+ * ==========================================================
+ */
 
 function printInvestigationHeader(userInput) {
   console.log();
@@ -327,6 +630,12 @@ function printExecutionSummary(metrics) {
   console.log();
 }
 
+/*
+ * ==========================================================
+ * MAIN EXPLORER AGENT
+ * ==========================================================
+ */
+
 async function runExplorerAgent(conversation, userInput) {
   printInvestigationHeader(userInput);
 
@@ -340,6 +649,7 @@ async function runExplorerAgent(conversation, userInput) {
 
   let aiCalls = 0;
   let toolCalls = 0;
+
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let totalTokens = 0;
@@ -367,9 +677,14 @@ async function runExplorerAgent(conversation, userInput) {
 
       spinner.start(secondary("Analyzing workspace..."));
 
+      /*
+       * Ask the model for a structured action.
+       */
+
       const aiResult = await aiService.generateExplorerAction(messages);
 
       const action = aiResult.action;
+
       const usage = aiResult.usage;
 
       aiCalls++;
@@ -384,8 +699,39 @@ async function runExplorerAgent(conversation, userInput) {
 
       printTokenUsage(usage);
 
+      /*
+       * ======================================================
+       * FINISH
+       * ======================================================
+       */
+
       if (action.action === "finish") {
-        finalResponse = action.response || action.reason;
+        try {
+          validateExplorerAction(action);
+
+          finalResponse = action.response.trim();
+        } catch (error) {
+          console.log();
+
+          console.log(`  ${rose("✕")} ${rose(error.message)}`);
+
+          /*
+           * Give the invalid action back to the AI
+           * and explicitly explain what was wrong.
+           */
+
+          messages.push({
+            role: "assistant",
+            content: JSON.stringify(action),
+          });
+
+          messages.push({
+            role: "user",
+            content: buildFinishValidationFeedback(error),
+          });
+
+          continue;
+        }
 
         console.log();
 
@@ -394,13 +740,29 @@ async function runExplorerAgent(conversation, userInput) {
         break;
       }
 
+      /*
+       * ======================================================
+       * SHOW ACTION
+       * ======================================================
+       */
+
       console.log();
 
       console.log(`  ${amber("▸")} ${getActionLabel(action)}`);
 
-      console.log(`  ${muted(action.reason)}`);
+      console.log(
+        `  ${muted(
+          action.reason || "Executing the required workspace operation...",
+        )}`,
+      );
 
       console.log();
+
+      /*
+       * ======================================================
+       * EXECUTE TOOL
+       * ======================================================
+       */
 
       spinner.start(secondary("Executing workspace operation..."));
 
@@ -409,11 +771,9 @@ async function runExplorerAgent(conversation, userInput) {
       try {
         toolResult = await executeExplorerAction(action);
       } catch (error) {
-        spinner.stop();
-
         toolResult = {
           success: false,
-          error: error.message,
+          error: error?.message || "Unknown Explorer tool error.",
         };
       }
 
@@ -423,46 +783,41 @@ async function runExplorerAgent(conversation, userInput) {
 
       printActionComplete(action, toolResult);
 
+      /*
+       * ======================================================
+       * STORE ACTION IN AGENT MEMORY
+       * ======================================================
+       */
+
       messages.push({
         role: "assistant",
         content: JSON.stringify(action),
       });
 
+      /*
+       * ======================================================
+       * SEND TOOL RESULT BACK TO AI
+       * ======================================================
+       */
+
       messages.push({
         role: "user",
-        content: `
-EXPLORER TOOL RESULT
-
-Action:
-${action.action}
-
-Result:
-${JSON.stringify(toolResult, null, 2)}
-
-Continue working on the ORIGINAL USER REQUEST.
-
-Rules:
-- Treat the tool result as workspace evidence.
-- Do not invent information.
-- Do not repeat an action if the result already contains what is needed.
-- Use another action only when more information is genuinely required.
-- If the request can now be answered, use the "finish" action.
-- If the user asked for filenames or folders only, do not read file contents.
-- If the user asked for file contents, read the relevant files.
-- If the user asked for a complete directory tree and the result is not truncated, normally finish.
-- If a tool returned an error, do not repeatedly perform the same failing action.
-- When finishing, "reason" should briefly explain why the investigation is complete.
-- "response" must contain the complete user-facing Markdown answer.
-`,
+        content: buildToolFeedback(action, toolResult),
       });
     }
+
+    /*
+     * ========================================================
+     * MAX STEPS
+     * ========================================================
+     */
 
     if (!finalResponse) {
       finalResponse = `## Investigation Incomplete
 
 I reached the maximum exploration limit of **${explorerConfig.maxSteps} steps** before I could confidently complete the request.
 
-Please narrow the request or target a specific project or file.`;
+No unverified operation has been reported as successful.`;
     }
 
     const durationMs = Date.now() - startedAt;
@@ -485,9 +840,16 @@ Please narrow the request or target a specific project or file.`;
     return finalResponse;
   } catch (error) {
     spinner.stop();
+
     throw error;
   }
 }
+
+/*
+ * ==========================================================
+ * EXPLORER CLI LOOP
+ * ==========================================================
+ */
 
 async function explorerLoop(conversation) {
   const helpRows = [
@@ -523,6 +885,7 @@ async function explorerLoop(conversation) {
     const userInput = await text({
       message: chalk.cyan("Message"),
       placeholder: "Ask me to explore your workspace...",
+
       validate(value) {
         if (!value || value.trim().length === 0) {
           return "Message cannot be empty";
@@ -569,6 +932,12 @@ async function explorerLoop(conversation) {
     }
   }
 }
+
+/*
+ * ==========================================================
+ * PUBLIC ENTRY POINT
+ * ==========================================================
+ */
 
 export async function startExplorerAgent(
   conversationId = null,

@@ -1,10 +1,33 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+
 import { explorerConfig } from "../config/explorer.config.js";
 
-/**
- * Resolve a path safely inside the configured workspace.
- */
+import {
+  getFileType,
+  readTextFile,
+  readPdfFile,
+  readDocxFile,
+  readImageFile,
+} from "./file-readers.js";
+
+/*
+|--------------------------------------------------------------------------
+| Workspace Path Security
+|--------------------------------------------------------------------------
+|
+| Every filesystem operation passes through this function.
+|
+| This prevents things like:
+|
+| ../../some-secret-file
+| C:\Users\...
+| /etc/passwd
+|
+| from escaping the configured workspace.
+|
+*/
+
 function resolveWorkspacePath(targetPath = ".") {
   const workspaceRoot = path.resolve(explorerConfig.workspace.root);
 
@@ -12,67 +35,170 @@ function resolveWorkspacePath(targetPath = ".") {
 
   const relativePath = path.relative(workspaceRoot, resolvedPath);
 
-  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+  /*
+   * If the relative path starts with "..", the target
+   * is outside the workspace.
+   */
+
+  if (
+    relativePath === ".." ||
+    relativePath.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativePath)
+  ) {
     throw new Error("Access denied: path is outside the workspace.");
   }
 
   return resolvedPath;
 }
 
-/**
- * Check whether a directory should be ignored.
- */
+/*
+|--------------------------------------------------------------------------
+| Ignore Rules
+|--------------------------------------------------------------------------
+*/
+
 function isIgnoredDirectory(name) {
   return explorerConfig.workspace.ignoredDirectories.includes(name);
 }
 
-/**
- * Check whether a file should be ignored.
- */
 function isIgnoredFile(name) {
   return explorerConfig.workspace.ignoredFiles.includes(name);
 }
 
-/**
- * Sort filesystem Dirent objects.
- *
- * Directories come first, followed by files.
- * Items inside each group are sorted alphabetically.
- */
+/*
+|--------------------------------------------------------------------------
+| Directory Sorting
+|--------------------------------------------------------------------------
+*/
+
 function sortDirents(entries) {
   return entries.sort((a, b) => {
     const aType = a.isDirectory() ? "directory" : "file";
 
     const bType = b.isDirectory() ? "directory" : "file";
 
+    /*
+     * Directories first.
+     */
+
     if (aType !== bType) {
       return aType === "directory" ? -1 : 1;
     }
 
-    return a.name.localeCompare(b.name);
+    return a.name.localeCompare(b.name, undefined, {
+      sensitivity: "base",
+    });
   });
 }
 
-/**
- * Sort Explorer result objects.
- */
 function sortResults(entries) {
   return entries.sort((a, b) => {
     if (a.type !== b.type) {
       return a.type === "directory" ? -1 : 1;
     }
 
-    return a.name.localeCompare(b.name);
+    return a.name.localeCompare(b.name, undefined, {
+      sensitivity: "base",
+    });
   });
 }
 
+/*
+|--------------------------------------------------------------------------
+| Relative Path
+|--------------------------------------------------------------------------
+*/
+
+function getRelativePath(filePath) {
+  const relativePath = path.relative(explorerConfig.workspace.root, filePath);
+
+  /*
+   * The workspace root itself should be represented
+   * as "." rather than an empty string.
+   */
+
+  return relativePath || ".";
+}
+
+/*
+|--------------------------------------------------------------------------
+| Write Size
+|--------------------------------------------------------------------------
+*/
+
+function getMaxWriteSize() {
+  return (
+    explorerConfig.limits.maxWriteSize ?? explorerConfig.limits.maxFileSize
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| File Size Formatting
+|--------------------------------------------------------------------------
+*/
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes)) {
+    return "unknown size";
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} bytes`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/*
+|--------------------------------------------------------------------------
+| File Type Helpers
+|--------------------------------------------------------------------------
+*/
+
+function isEditableFileType(fileType) {
+  return fileType === "text";
+}
+
+function assertEditableFile(filePath) {
+  const fileType = getFileType(filePath);
+
+  if (!isEditableFileType(fileType)) {
+    throw new Error(
+      `This file type cannot currently be edited. ` +
+        `Explorer only supports editing text/source files.`,
+    );
+  }
+
+  return fileType;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Create Explorer Tools
+|--------------------------------------------------------------------------
+*/
+
 export function createExplorerTools() {
   return {
-    /**
-     * List the immediate contents of a directory.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | LIST DIRECTORY
+    |--------------------------------------------------------------------------
+    */
+
     async listDirectory(targetPath = ".") {
       const directory = resolveWorkspacePath(targetPath);
+
+      const stats = await fs.stat(directory);
+
+      if (!stats.isDirectory()) {
+        throw new Error("The specified path is not a directory.");
+      }
 
       const entries = await fs.readdir(directory, {
         withFileTypes: true,
@@ -83,9 +209,17 @@ export function createExplorerTools() {
       const results = [];
 
       for (const entry of entries) {
+        /*
+         * Ignore configured directories.
+         */
+
         if (entry.isDirectory() && isIgnoredDirectory(entry.name)) {
           continue;
         }
+
+        /*
+         * Ignore configured files.
+         */
 
         if (entry.isFile() && isIgnoredFile(entry.name)) {
           continue;
@@ -101,7 +235,11 @@ export function createExplorerTools() {
       sortResults(results);
 
       return {
-        path: targetPath,
+        success: true,
+
+        operation: "list_directory",
+
+        path: getRelativePath(directory),
 
         entries: results,
 
@@ -109,17 +247,20 @@ export function createExplorerTools() {
       };
     },
 
-    /**
-     * Recursively list a directory tree.
-     *
-     * This is useful when the user asks:
-     *
-     * "Show me all files and folders."
-     *
-     * It does NOT read file contents.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | LIST DIRECTORY TREE
+    |--------------------------------------------------------------------------
+    */
+
     async listDirectoryTree(targetPath = ".") {
       const rootDirectory = resolveWorkspacePath(targetPath);
+
+      const rootStats = await fs.stat(rootDirectory);
+
+      if (!rootStats.isDirectory()) {
+        throw new Error("The specified path is not a directory.");
+      }
 
       const maxDepth = explorerConfig.limits.maxTreeDepth;
 
@@ -130,14 +271,15 @@ export function createExplorerTools() {
       let truncated = false;
 
       async function buildTree(currentDirectory, relativePath, depth) {
-        /**
-         * Stop if maximum depth is reached.
+        /*
+         * Stop recursion when maximum depth is reached.
          */
+
         if (depth > maxDepth) {
           truncated = true;
 
           return {
-            name: path.basename(currentDirectory),
+            name: path.basename(currentDirectory) || ".",
 
             type: "directory",
 
@@ -149,10 +291,10 @@ export function createExplorerTools() {
           };
         }
 
-        /**
-         * Stop if maximum number of entries
-         * has been reached.
+        /*
+         * Stop when maximum number of entries is reached.
          */
+
         if (totalEntries >= maxEntries) {
           truncated = true;
 
@@ -163,9 +305,6 @@ export function createExplorerTools() {
           withFileTypes: true,
         });
 
-        /**
-         * Remove ignored files/directories.
-         */
         const filteredEntries = entries.filter((entry) => {
           if (entry.isDirectory() && isIgnoredDirectory(entry.name)) {
             return false;
@@ -178,20 +317,13 @@ export function createExplorerTools() {
           return true;
         });
 
-        /**
-         * Sort actual Dirent objects.
-         */
         sortDirents(filteredEntries);
 
         const children = [];
 
         for (const entry of filteredEntries) {
-          /**
-           * Check global entry limit.
-           */
           if (totalEntries >= maxEntries) {
             truncated = true;
-
             break;
           }
 
@@ -201,9 +333,6 @@ export function createExplorerTools() {
 
           const entryRelativePath = path.join(relativePath, entry.name);
 
-          /**
-           * Directory
-           */
           if (entry.isDirectory()) {
             const directoryNode = await buildTree(
               entryPath,
@@ -218,9 +347,6 @@ export function createExplorerTools() {
             continue;
           }
 
-          /**
-           * File
-           */
           children.push({
             name: entry.name,
 
@@ -250,7 +376,11 @@ export function createExplorerTools() {
       const tree = await buildTree(rootDirectory, ".", 0);
 
       return {
-        path: targetPath,
+        success: true,
+
+        operation: "list_directory_tree",
+
+        path: getRelativePath(rootDirectory),
 
         tree,
 
@@ -264,14 +394,17 @@ export function createExplorerTools() {
       };
     },
 
-    /**
-     * Search for files by filename.
-     *
-     * This searches FILE NAMES only.
-     * It does not search file contents.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | SEARCH FILES
+    |--------------------------------------------------------------------------
+    |
+    | Searches filenames only.
+    |
+    */
+
     async searchFiles(query, targetPath = ".") {
-      if (!query || !query.trim()) {
+      if (typeof query !== "string" || !query.trim()) {
         throw new Error("Search query cannot be empty.");
       }
 
@@ -279,13 +412,18 @@ export function createExplorerTools() {
 
       const directory = resolveWorkspacePath(targetPath);
 
+      const directoryStats = await fs.stat(directory);
+
+      if (!directoryStats.isDirectory()) {
+        throw new Error("The search path is not a directory.");
+      }
+
       const results = [];
 
+      const maxResults = explorerConfig.limits.maxSearchResults;
+
       async function searchDirectory(currentDirectory) {
-        /**
-         * Stop when result limit is reached.
-         */
-        if (results.length >= explorerConfig.limits.maxSearchResults) {
+        if (results.length >= maxResults) {
           return;
         }
 
@@ -293,53 +431,50 @@ export function createExplorerTools() {
           withFileTypes: true,
         });
 
-        /**
-         * Sort actual Dirent objects.
-         */
         sortDirents(entries);
 
         for (const entry of entries) {
-          /**
-           * Stop when result limit
-           * is reached.
-           */
-          if (results.length >= explorerConfig.limits.maxSearchResults) {
+          if (results.length >= maxResults) {
             return;
           }
 
-          /**
+          /*
            * Ignore directories.
            */
+
           if (entry.isDirectory() && isIgnoredDirectory(entry.name)) {
             continue;
           }
 
-          /**
+          /*
            * Ignore files.
            */
+
           if (entry.isFile() && isIgnoredFile(entry.name)) {
             continue;
           }
 
           const entryPath = path.join(currentDirectory, entry.name);
 
-          /**
+          /*
            * Recursively search directories.
            */
+
           if (entry.isDirectory()) {
             await searchDirectory(entryPath);
 
             continue;
           }
 
-          /**
-           * Match filename.
+          /*
+           * Filename matching only.
            */
+
           if (entry.name.toLowerCase().includes(normalizedQuery)) {
             results.push({
               name: entry.name,
 
-              path: path.relative(explorerConfig.workspace.root, entryPath),
+              path: getRelativePath(entryPath),
 
               type: "file",
             });
@@ -350,67 +485,668 @@ export function createExplorerTools() {
       await searchDirectory(directory);
 
       return {
+        success: true,
+
+        operation: "search_files",
+
         query: query.trim(),
 
-        path: targetPath,
+        path: getRelativePath(directory),
 
         results,
 
         total: results.length,
+
+        truncated: results.length >= maxResults,
       };
     },
 
-    /**
-     * Read the contents of a file.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | READ FILE
+    |--------------------------------------------------------------------------
+    */
+
     async readFile(targetPath) {
-      if (!targetPath || !targetPath.trim()) {
+      if (typeof targetPath !== "string" || !targetPath.trim()) {
         throw new Error("File path cannot be empty.");
       }
 
-      const filePath = resolveWorkspacePath(targetPath.trim());
+      const cleanPath = targetPath.trim();
+
+      const filePath = resolveWorkspacePath(cleanPath);
 
       const fileName = path.basename(filePath);
 
-      /**
-       * Never allow ignored files.
+      /*
+       * Never expose ignored files.
        */
+
       if (isIgnoredFile(fileName)) {
         throw new Error("Access denied: file is ignored.");
       }
 
       const stats = await fs.stat(filePath);
 
-      /**
-       * Make sure the target
-       * is actually a file.
-       */
       if (!stats.isFile()) {
         throw new Error("The specified path is not a file.");
       }
 
-      /**
-       * Protect the agent from
-       * enormous files.
-       */
-      if (stats.size > explorerConfig.limits.maxFileSize) {
+      const fileType = getFileType(filePath);
+
+      if (fileType === "unsupported") {
         throw new Error(
-          `File is too large. Maximum allowed size is ${explorerConfig.limits.maxFileSize} bytes.`,
+          `Unsupported file type: ${path.extname(filePath) || "unknown"}`,
         );
       }
 
-      const content = await fs.readFile(filePath, "utf-8");
+      const relativePath = getRelativePath(filePath);
+
+      /*
+       * ========================================================
+       * TEXT / SOURCE FILE
+       * ========================================================
+       */
+
+      if (fileType === "text") {
+        if (stats.size > explorerConfig.limits.maxFileSize) {
+          throw new Error(
+            `File is too large. ` +
+              `Maximum allowed size is ${formatBytes(
+                explorerConfig.limits.maxFileSize,
+              )}.`,
+          );
+        }
+
+        const content = await readTextFile(filePath);
+
+        return {
+          success: true,
+
+          operation: "read_file",
+
+          name: fileName,
+
+          path: relativePath,
+
+          type: "text",
+
+          size: stats.size,
+
+          sizeFormatted: formatBytes(stats.size),
+
+          content,
+        };
+      }
+
+      /*
+       * ========================================================
+       * PDF
+       * ========================================================
+       */
+
+      if (fileType === "pdf") {
+        if (stats.size > explorerConfig.limits.maxDocumentSize) {
+          throw new Error(
+            `PDF is too large. ` +
+              `Maximum allowed size is ${formatBytes(
+                explorerConfig.limits.maxDocumentSize,
+              )}.`,
+          );
+        }
+
+        const result = await readPdfFile(filePath);
+
+        return {
+          success: true,
+
+          operation: "read_file",
+
+          name: fileName,
+
+          path: relativePath,
+
+          type: "pdf",
+
+          size: stats.size,
+
+          sizeFormatted: formatBytes(stats.size),
+
+          pages: result.pages,
+
+          content: result.content,
+        };
+      }
+
+      /*
+       * ========================================================
+       * DOCX
+       * ========================================================
+       */
+
+      if (fileType === "docx") {
+        if (stats.size > explorerConfig.limits.maxDocumentSize) {
+          throw new Error(
+            `DOCX is too large. ` +
+              `Maximum allowed size is ${formatBytes(
+                explorerConfig.limits.maxDocumentSize,
+              )}.`,
+          );
+        }
+
+        const result = await readDocxFile(filePath);
+
+        return {
+          success: true,
+
+          operation: "read_file",
+
+          name: fileName,
+
+          path: relativePath,
+
+          type: "docx",
+
+          size: stats.size,
+
+          sizeFormatted: formatBytes(stats.size),
+
+          content: result.content,
+
+          messages: result.messages,
+        };
+      }
+
+      /*
+       * ========================================================
+       * IMAGE
+       * ========================================================
+       */
+
+      if (fileType === "image") {
+        const maxImageSize =
+          explorerConfig.limits.maxImageSize ?? 10 * 1024 * 1024;
+
+        if (stats.size > maxImageSize) {
+          throw new Error(
+            `Image is too large. ` +
+              `Maximum allowed size is ${formatBytes(maxImageSize)}.`,
+          );
+        }
+
+        const result = await readImageFile(filePath);
+
+        return {
+          success: true,
+
+          operation: "read_file",
+
+          name: result.name,
+
+          path: relativePath,
+
+          type: "image",
+
+          size: result.size,
+
+          sizeFormatted: formatBytes(result.size),
+
+          mediaType: result.mediaType,
+
+          data: result.data,
+        };
+      }
+
+      throw new Error(`Unsupported file type: ${fileType}`);
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | WRITE FILE
+    |--------------------------------------------------------------------------
+    |
+    | Creates a new file OR completely replaces an existing file.
+    |
+    */
+
+    async writeFile(targetPath, content) {
+      if (typeof targetPath !== "string" || !targetPath.trim()) {
+        throw new Error("File path cannot be empty.");
+      }
+
+      /*
+       * Content must actually exist.
+       */
+
+      if (typeof content !== "string") {
+        throw new Error("File content must be a string.");
+      }
+
+      /*
+       * IMPORTANT:
+       *
+       * Never allow the agent to create
+       * an empty file accidentally.
+       */
+
+      if (content.trim().length === 0) {
+        throw new Error(
+          "Cannot create or overwrite a file with empty content.",
+        );
+      }
+
+      const cleanPath = targetPath.trim();
+
+      const filePath = resolveWorkspacePath(cleanPath);
+
+      const fileName = path.basename(filePath);
+
+      /*
+       * Never write ignored files.
+       */
+
+      if (isIgnoredFile(fileName)) {
+        throw new Error("Access denied: cannot write to an ignored file.");
+      }
+
+      /*
+       * write_file only supports text/source files.
+       */
+
+      const extensionType = getFileType(filePath);
+
+      if (extensionType !== "text") {
+        throw new Error(
+          "write_file currently supports text/source files only.",
+        );
+      }
+
+      /*
+       * Check content size BEFORE writing.
+       */
+
+      const contentSize = Buffer.byteLength(content, "utf8");
+
+      const maxWriteSize = getMaxWriteSize();
+
+      if (contentSize > maxWriteSize) {
+        throw new Error(
+          `Content is too large. ` +
+            `Maximum allowed size is ${formatBytes(maxWriteSize)}.`,
+        );
+      }
+
+      let existed = false;
+
+      let previousSize = 0;
+
+      /*
+       * Check existing path.
+       */
+
+      try {
+        const stats = await fs.stat(filePath);
+
+        if (stats.isDirectory()) {
+          throw new Error("Cannot write file content to a directory.");
+        }
+
+        if (stats.isFile()) {
+          existed = true;
+          previousSize = stats.size;
+        }
+      } catch (error) {
+        if (error.code !== "ENOENT") {
+          throw error;
+        }
+      }
+
+      /*
+       * Make sure the parent directory exists.
+       */
+
+      const parentDirectory = path.dirname(filePath);
+
+      await fs.mkdir(parentDirectory, {
+        recursive: true,
+      });
+
+      /*
+       * Write the complete content.
+       */
+
+      await fs.writeFile(filePath, content, "utf8");
+
+      /*
+       * Verify the file after writing.
+       */
+
+      const stats = await fs.stat(filePath);
+
+      if (!stats.isFile()) {
+        throw new Error(
+          "File write completed but the resulting path is not a file.",
+        );
+      }
+
+      /*
+       * Read back the file to verify
+       * that the filesystem contains content.
+       */
+
+      const writtenContent = await fs.readFile(filePath, "utf8");
+
+      if (writtenContent !== content) {
+        throw new Error(
+          "File verification failed: written content does not match the requested content.",
+        );
+      }
 
       return {
+        success: true,
+
+        operation: existed ? "overwrite" : "create",
+
         name: fileName,
 
-        path: path.relative(explorerConfig.workspace.root, filePath),
-
-        type: "file",
+        path: getRelativePath(filePath),
 
         size: stats.size,
 
-        content,
+        sizeFormatted: formatBytes(stats.size),
+
+        previousSize,
+
+        created: !existed,
+
+        overwritten: existed,
+
+        verified: true,
+      };
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | EDIT FILE
+    |--------------------------------------------------------------------------
+    |
+    | Performs one precise replacement.
+    |
+    | oldText MUST occur exactly once.
+    |
+    */
+
+    async editFile(targetPath, oldText, newText) {
+      if (typeof targetPath !== "string" || !targetPath.trim()) {
+        throw new Error("File path cannot be empty.");
+      }
+
+      if (typeof oldText !== "string") {
+        throw new Error("oldText must be a string.");
+      }
+
+      if (typeof newText !== "string") {
+        throw new Error("newText must be a string.");
+      }
+
+      if (oldText.length === 0) {
+        throw new Error("oldText cannot be empty.");
+      }
+
+      const cleanPath = targetPath.trim();
+
+      const filePath = resolveWorkspacePath(cleanPath);
+
+      const fileName = path.basename(filePath);
+
+      /*
+       * Never edit ignored files.
+       */
+
+      if (isIgnoredFile(fileName)) {
+        throw new Error("Access denied: cannot edit an ignored file.");
+      }
+
+      const stats = await fs.stat(filePath);
+
+      if (!stats.isFile()) {
+        throw new Error("The specified path is not a file.");
+      }
+
+      /*
+       * Ensure this is an editable file.
+       */
+
+      const fileType = assertEditableFile(filePath);
+
+      /*
+       * File size limit.
+       */
+
+      if (stats.size > explorerConfig.limits.maxFileSize) {
+        throw new Error(
+          `File is too large. ` +
+            `Maximum allowed size is ${formatBytes(
+              explorerConfig.limits.maxFileSize,
+            )}.`,
+        );
+      }
+
+      /*
+       * Read current content.
+       */
+
+      const currentContent = await readTextFile(filePath);
+
+      /*
+       * Count exact occurrences.
+       */
+
+      const occurrences = currentContent.split(oldText).length - 1;
+
+      /*
+       * Nothing found.
+       */
+
+      if (occurrences === 0) {
+        throw new Error("The specified oldText was not found in the file.");
+      }
+
+      /*
+       * Multiple matches are dangerous.
+       *
+       * Do NOT guess which occurrence
+       * the user intended.
+       */
+
+      if (occurrences > 1) {
+        throw new Error(
+          `The specified oldText was found ${occurrences} times. Refusing to edit ambiguously. Provide a larger unique section.`,
+        );
+      }
+
+      /*
+       * Generate new file content.
+       */
+
+      const updatedContent = currentContent.replace(oldText, newText);
+
+      /*
+       * Prevent accidental empty files.
+       */
+
+      if (updatedContent.trim().length === 0) {
+        throw new Error(
+          "Edit would result in an empty file. Refusing the operation.",
+        );
+      }
+
+      /*
+       * Check final size.
+       */
+
+      const updatedSize = Buffer.byteLength(updatedContent, "utf8");
+
+      const maxWriteSize = getMaxWriteSize();
+
+      if (updatedSize > maxWriteSize) {
+        throw new Error(
+          `Updated file is too large. ` +
+            `Maximum allowed size is ${formatBytes(maxWriteSize)}.`,
+        );
+      }
+
+      /*
+       * Write the modified content.
+       */
+
+      await fs.writeFile(filePath, updatedContent, "utf8");
+
+      /*
+       * Verify the modification.
+       */
+
+      const verifiedContent = await readTextFile(filePath);
+
+      if (verifiedContent !== updatedContent) {
+        throw new Error(
+          "Edit verification failed: resulting file content does not match the expected content.",
+        );
+      }
+
+      const finalStats = await fs.stat(filePath);
+
+      return {
+        success: true,
+
+        operation: "edit",
+
+        name: fileName,
+
+        path: getRelativePath(filePath),
+
+        type: fileType,
+
+        previousSize: stats.size,
+
+        previousSizeFormatted: formatBytes(stats.size),
+
+        size: finalStats.size,
+
+        sizeFormatted: formatBytes(finalStats.size),
+
+        replacements: 1,
+
+        verified: true,
+      };
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE FILE
+    |--------------------------------------------------------------------------
+    |
+    | Deletes files only.
+    |
+    | Directories are NEVER deleted.
+    |
+    */
+
+    async deleteFile(targetPath) {
+      if (typeof targetPath !== "string" || !targetPath.trim()) {
+        throw new Error("File path cannot be empty.");
+      }
+
+      const cleanPath = targetPath.trim();
+
+      /*
+       * Do not allow deleting the
+       * workspace root.
+       */
+
+      if (cleanPath === "." || cleanPath === "" || cleanPath === path.sep) {
+        throw new Error("Refusing to delete the workspace root.");
+      }
+
+      const filePath = resolveWorkspacePath(cleanPath);
+
+      const fileName = path.basename(filePath);
+
+      /*
+       * Never delete ignored files.
+       */
+
+      if (isIgnoredFile(fileName)) {
+        throw new Error("Access denied: cannot delete an ignored file.");
+      }
+
+      const stats = await fs.stat(filePath);
+
+      /*
+       * Never delete directories.
+       */
+
+      if (stats.isDirectory()) {
+        throw new Error("delete_file can only delete files, not directories.");
+      }
+
+      /*
+       * Only regular files.
+       */
+
+      if (!stats.isFile()) {
+        throw new Error("The specified path is not a regular file.");
+      }
+
+      const relativePath = getRelativePath(filePath);
+
+      const size = stats.size;
+
+      /*
+       * Delete.
+       */
+
+      await fs.unlink(filePath);
+
+      /*
+       * Verify deletion.
+       */
+
+      try {
+        await fs.access(filePath);
+
+        /*
+         * If access succeeds,
+         * the file still exists.
+         */
+
+        throw new Error("Delete verification failed: the file still exists.");
+      } catch (error) {
+        /*
+         * ENOENT is exactly what we want.
+         */
+
+        if (error.code !== "ENOENT") {
+          throw error;
+        }
+      }
+
+      return {
+        success: true,
+
+        operation: "delete",
+
+        name: fileName,
+
+        path: relativePath,
+
+        size,
+
+        sizeFormatted: formatBytes(size),
+
+        deleted: true,
+
+        verified: true,
       };
     },
   };
