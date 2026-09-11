@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs";
+import { promises as fs, stat } from "node:fs";
 import path from "node:path";
 
 import { explorerConfig } from "../config/explorer.config.js";
@@ -10,35 +10,12 @@ import {
   readDocxFile,
   readImageFile,
 } from "./file-readers.js";
-
-/*
-|--------------------------------------------------------------------------
-| Workspace Path Security
-|--------------------------------------------------------------------------
-|
-| Every filesystem operation passes through this function.
-|
-| This prevents things like:
-|
-| ../../some-secret-file
-| C:\Users\...
-| /etc/passwd
-|
-| from escaping the configured workspace.
-|
-*/
+import { success } from "zod";
 
 function resolveWorkspacePath(targetPath = ".") {
   const workspaceRoot = path.resolve(explorerConfig.workspace.root);
-
   const resolvedPath = path.resolve(workspaceRoot, targetPath);
-
   const relativePath = path.relative(workspaceRoot, resolvedPath);
-
-  /*
-   * If the relative path starts with "..", the target
-   * is outside the workspace.
-   */
 
   if (
     relativePath === ".." ||
@@ -51,12 +28,6 @@ function resolveWorkspacePath(targetPath = ".") {
   return resolvedPath;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Ignore Rules
-|--------------------------------------------------------------------------
-*/
-
 function isIgnoredDirectory(name) {
   return explorerConfig.workspace.ignoredDirectories.includes(name);
 }
@@ -64,12 +35,6 @@ function isIgnoredDirectory(name) {
 function isIgnoredFile(name) {
   return explorerConfig.workspace.ignoredFiles.includes(name);
 }
-
-/*
-|--------------------------------------------------------------------------
-| Directory Sorting
-|--------------------------------------------------------------------------
-*/
 
 function sortDirents(entries) {
   return entries.sort((a, b) => {
@@ -103,40 +68,16 @@ function sortResults(entries) {
   });
 }
 
-/*
-|--------------------------------------------------------------------------
-| Relative Path
-|--------------------------------------------------------------------------
-*/
-
 function getRelativePath(filePath) {
   const relativePath = path.relative(explorerConfig.workspace.root, filePath);
-
-  /*
-   * The workspace root itself should be represented
-   * as "." rather than an empty string.
-   */
-
   return relativePath || ".";
 }
-
-/*
-|--------------------------------------------------------------------------
-| Write Size
-|--------------------------------------------------------------------------
-*/
 
 function getMaxWriteSize() {
   return (
     explorerConfig.limits.maxWriteSize ?? explorerConfig.limits.maxFileSize
   );
 }
-
-/*
-|--------------------------------------------------------------------------
-| File Size Formatting
-|--------------------------------------------------------------------------
-*/
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes)) {
@@ -154,12 +95,6 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/*
-|--------------------------------------------------------------------------
-| File Type Helpers
-|--------------------------------------------------------------------------
-*/
-
 function isEditableFileType(fileType) {
   return fileType === "text";
 }
@@ -170,26 +105,15 @@ function assertEditableFile(filePath) {
   if (!isEditableFileType(fileType)) {
     throw new Error(
       `This file type cannot currently be edited. ` +
-        `Explorer only supports editing text/source files.`,
+      `Explorer only supports editing text/source files.`,
     );
   }
 
   return fileType;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Create Explorer Tools
-|--------------------------------------------------------------------------
-*/
-
 export function createExplorerTools() {
   return {
-    /*
-    |--------------------------------------------------------------------------
-    | LIST DIRECTORY
-    |--------------------------------------------------------------------------
-    */
 
     async listDirectory(targetPath = ".") {
       const directory = resolveWorkspacePath(targetPath);
@@ -246,12 +170,6 @@ export function createExplorerTools() {
         total: results.length,
       };
     },
-
-    /*
-    |--------------------------------------------------------------------------
-    | LIST DIRECTORY TREE
-    |--------------------------------------------------------------------------
-    */
 
     async listDirectoryTree(targetPath = ".") {
       const rootDirectory = resolveWorkspacePath(targetPath);
@@ -367,8 +285,8 @@ export function createExplorerTools() {
 
           ...(depth >= maxDepth
             ? {
-                truncated: true,
-              }
+              truncated: true,
+            }
             : {}),
         };
       }
@@ -393,15 +311,6 @@ export function createExplorerTools() {
         truncated,
       };
     },
-
-    /*
-    |--------------------------------------------------------------------------
-    | SEARCH FILES
-    |--------------------------------------------------------------------------
-    |
-    | Searches filenames only.
-    |
-    */
 
     async searchFiles(query, targetPath = ".") {
       if (typeof query !== "string" || !query.trim()) {
@@ -501,12 +410,6 @@ export function createExplorerTools() {
       };
     },
 
-    /*
-    |--------------------------------------------------------------------------
-    | READ FILE
-    |--------------------------------------------------------------------------
-    */
-
     async readFile(targetPath) {
       if (typeof targetPath !== "string" || !targetPath.trim()) {
         throw new Error("File path cannot be empty.");
@@ -517,10 +420,6 @@ export function createExplorerTools() {
       const filePath = resolveWorkspacePath(cleanPath);
 
       const fileName = path.basename(filePath);
-
-      /*
-       * Never expose ignored files.
-       */
 
       if (isIgnoredFile(fileName)) {
         throw new Error("Access denied: file is ignored.");
@@ -542,19 +441,13 @@ export function createExplorerTools() {
 
       const relativePath = getRelativePath(filePath);
 
-      /*
-       * ========================================================
-       * TEXT / SOURCE FILE
-       * ========================================================
-       */
-
       if (fileType === "text") {
         if (stats.size > explorerConfig.limits.maxFileSize) {
           throw new Error(
             `File is too large. ` +
-              `Maximum allowed size is ${formatBytes(
-                explorerConfig.limits.maxFileSize,
-              )}.`,
+            `Maximum allowed size is ${formatBytes(
+              explorerConfig.limits.maxFileSize,
+            )}.`,
           );
         }
 
@@ -579,19 +472,13 @@ export function createExplorerTools() {
         };
       }
 
-      /*
-       * ========================================================
-       * PDF
-       * ========================================================
-       */
-
       if (fileType === "pdf") {
         if (stats.size > explorerConfig.limits.maxDocumentSize) {
           throw new Error(
             `PDF is too large. ` +
-              `Maximum allowed size is ${formatBytes(
-                explorerConfig.limits.maxDocumentSize,
-              )}.`,
+            `Maximum allowed size is ${formatBytes(
+              explorerConfig.limits.maxDocumentSize,
+            )}.`,
           );
         }
 
@@ -628,9 +515,9 @@ export function createExplorerTools() {
         if (stats.size > explorerConfig.limits.maxDocumentSize) {
           throw new Error(
             `DOCX is too large. ` +
-              `Maximum allowed size is ${formatBytes(
-                explorerConfig.limits.maxDocumentSize,
-              )}.`,
+            `Maximum allowed size is ${formatBytes(
+              explorerConfig.limits.maxDocumentSize,
+            )}.`,
           );
         }
 
@@ -670,7 +557,7 @@ export function createExplorerTools() {
         if (stats.size > maxImageSize) {
           throw new Error(
             `Image is too large. ` +
-              `Maximum allowed size is ${formatBytes(maxImageSize)}.`,
+            `Maximum allowed size is ${formatBytes(maxImageSize)}.`,
           );
         }
 
@@ -699,15 +586,6 @@ export function createExplorerTools() {
 
       throw new Error(`Unsupported file type: ${fileType}`);
     },
-
-    /*
-    |--------------------------------------------------------------------------
-    | WRITE FILE
-    |--------------------------------------------------------------------------
-    |
-    | Creates a new file OR completely replaces an existing file.
-    |
-    */
 
     async writeFile(targetPath, content) {
       if (typeof targetPath !== "string" || !targetPath.trim()) {
@@ -772,7 +650,7 @@ export function createExplorerTools() {
       if (contentSize > maxWriteSize) {
         throw new Error(
           `Content is too large. ` +
-            `Maximum allowed size is ${formatBytes(maxWriteSize)}.`,
+          `Maximum allowed size is ${formatBytes(maxWriteSize)}.`,
         );
       }
 
@@ -865,17 +743,6 @@ export function createExplorerTools() {
       };
     },
 
-    /*
-    |--------------------------------------------------------------------------
-    | EDIT FILE
-    |--------------------------------------------------------------------------
-    |
-    | Performs one precise replacement.
-    |
-    | oldText MUST occur exactly once.
-    |
-    */
-
     async editFile(targetPath, oldText, newText) {
       if (typeof targetPath !== "string" || !targetPath.trim()) {
         throw new Error("File path cannot be empty.");
@@ -926,9 +793,9 @@ export function createExplorerTools() {
       if (stats.size > explorerConfig.limits.maxFileSize) {
         throw new Error(
           `File is too large. ` +
-            `Maximum allowed size is ${formatBytes(
-              explorerConfig.limits.maxFileSize,
-            )}.`,
+          `Maximum allowed size is ${formatBytes(
+            explorerConfig.limits.maxFileSize,
+          )}.`,
         );
       }
 
@@ -992,7 +859,7 @@ export function createExplorerTools() {
       if (updatedSize > maxWriteSize) {
         throw new Error(
           `Updated file is too large. ` +
-            `Maximum allowed size is ${formatBytes(maxWriteSize)}.`,
+          `Maximum allowed size is ${formatBytes(maxWriteSize)}.`,
         );
       }
 
@@ -1040,17 +907,6 @@ export function createExplorerTools() {
         verified: true,
       };
     },
-
-    /*
-    |--------------------------------------------------------------------------
-    | DELETE FILE
-    |--------------------------------------------------------------------------
-    |
-    | Deletes files only.
-    |
-    | Directories are NEVER deleted.
-    |
-    */
 
     async deleteFile(targetPath) {
       if (typeof targetPath !== "string" || !targetPath.trim()) {
@@ -1149,5 +1005,32 @@ export function createExplorerTools() {
         verified: true,
       };
     },
+
+    async createDirectory(targetPath) {
+      if (typeof targetPath !== "string" || !targetPath.trim()) {
+        throw new Error("Directory path cannot be empty.");
+      }
+
+      const cleanPath = targetPath.trim();
+      const directory = resolveWorkspacePath(cleanPath);
+
+      await fs.mkdir(directory, { recursive: true });
+
+      const stats = await fs.stat(directory);
+
+      if (!stats.isDirectory()) {
+        throw new Error("Directory creation completed but the resulting path is not a directory.");
+      }
+
+      return {
+        success: true,
+        operation: "create_directory",
+        path: getRelativePath(directory),
+        created: true,
+        verified: true
+      }
+    }
+
+
   };
 }
